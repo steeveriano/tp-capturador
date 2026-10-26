@@ -4,6 +4,8 @@
  * Va pegado a la hoja (Extensiones › Apps Script). Se publica como aplicación web:
  *   Ejecutar como: yo · Quién tiene acceso: cualquier persona.
  * La clave NO vive en este código: está en Propiedades del script › TOKEN.
+ * Si el proyecto no está pegado a la hoja (proyecto independiente), la hoja se indica en
+ * Propiedades del script › HOJA_ID con el identificador que aparece en la URL de la hoja.
  * Ejecuta configurar() una vez: crea la pestaña, le da formato y genera la clave.
  */
 
@@ -60,7 +62,7 @@ function doPost(e) {
 
 /** Ejecutar una vez a mano. Crea la pestaña con formato y la clave, y la imprime en el registro. */
 function configurar() {
-  const libro = SpreadsheetApp.getActiveSpreadsheet();
+  const libro = libro_();
   libro.setSpreadsheetTimeZone(ZONA);
   const hoja = hoja_();
   const enc = hoja.getRange(1, 1, 1, ENCABEZADOS.length);
@@ -98,8 +100,15 @@ function rotarClave() {
   return configurar();
 }
 
+function libro_() {
+  const id = PropertiesService.getScriptProperties().getProperty('HOJA_ID');
+  const libro = id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet();
+  if (!libro) throw new Error('Falta HOJA_ID en Propiedades del script');
+  return libro;
+}
+
 function hoja_() {
-  const libro = SpreadsheetApp.getActiveSpreadsheet();
+  const libro = libro_();
   let hoja = libro.getSheetByName(PESTANA);
   if (!hoja) {
     hoja = libro.insertSheet(PESTANA, 0);

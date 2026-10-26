@@ -468,7 +468,7 @@
 
   async function guardar(registro) {
     const c = cfg();
-    if (!c.endpoint || !c.token) { toast('Este perfil no está activado. Abre el enlace de activación (está en la bóveda).', 'error'); return; }
+    if (!c.endpoint || !c.token) { toast('Este perfil no está activado. Abre el enlace de activación (bóveda: tp_capturador_enlace_activacion).', 'error'); return; }
     const datos = Object.assign({
       token: c.token, perfil: c.perfil, version: VERSION, sitio: HOST,
       titulo: document.title.slice(0, 300), url: location.origin + location.pathname, fechaCliente: new Date().toISOString(),

@@ -13,4 +13,6 @@ Reescritura completa del antiguo "Sales TierraParaíso — Capturador de Contact
 - Cola sin conexión: lo que no se pudo enviar se reintenta solo.
 - Actualización automática desde este repositorio y botón "Pedir un cambio a Claude Code".
 
+Receptor: el Apps Script quedó como proyecto independiente; lee la hoja de destino desde la propiedad `HOJA_ID`. Desplegado y verificado contra Google real el 2026-10-26 09:33: clave falsa rechazada, fila escrita, teléfono repetido detectado, fórmula neutralizada.
+
 Origen: chat https://claude.ai/chat/5658e950-6b45-4967-93af-7c220e4f7d88
