@@ -1,5 +1,11 @@
 # Cambios
 
+## 2.3.1 · 2026-10-26 16:09 (Bogotá)
+
+- El historial guarda todo lo copiado, sin filtrar lo que parezca contraseña, y ya no muestra el aviso. Decisión de Steeve. El historial sigue local al perfil y se borra a las 24 h.
+
+Origen: chat https://claude.ai/chat/5658e950-6b45-4967-93af-7c220e4f7d88
+
 ## 2.3.0 · 2026-10-26 15:19 (Bogotá)
 
 - El botón del puente pasa a llamarse "Pasar a…" y abre un selector con todas las conversaciones de Hermes y ChatGPT abiertas en el perfil; la emparejada va primero. Se puede elegir entre varias conversaciones de ChatGPT.

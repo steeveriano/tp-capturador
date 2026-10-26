@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TP Capturador
 // @namespace    https://github.com/steeveriano/tp-capturador
-// @version      2.3.0
+// @version      2.3.1
 // @description  Contactos a Google Sheets, menú propio de clic derecho, historial del portapapeles, recorte de zonas y puente Hermes ⇄ ChatGPT.
 // @author       Steeve Riaño · tierraparaiso
 // @homepageURL  https://github.com/steeveriano/tp-capturador
@@ -36,7 +36,7 @@
   'use strict';
   if (window.top !== window.self) return;
 
-  const VERSION = '2.3.0';
+  const VERSION = '2.3.1';
   const REPO = 'https://github.com/steeveriano/tp-capturador';
   const HOST = location.hostname;
 
@@ -51,7 +51,7 @@
     resaltar: true,        // subrayar teléfonos y correos
     barraSeleccion: true,  // barra flotante al seleccionar texto
     menuDerecho: true,     // menú propio en clic derecho
-    omitirSecretos: true,  // no guardar en historial lo que parezca contraseña o token
+    omitirSecretos: false, // si se enciende, no guarda en el historial lo que parezca contraseña o token
     puenteEncabezado: true, // al pasar entre Hermes y ChatGPT, anteponer "[Respuesta de …]"
   };
   const cfg = () => Object.assign({}, CFG_BASE, GM_getValue('cfg', {}));
@@ -197,7 +197,7 @@
     if (!texto || !texto.trim()) return;
     const c = cfg();
     if (elemento && elemento.matches && elemento.matches('input[type=password], [autocomplete="one-time-code"], [autocomplete="current-password"], [autocomplete="new-password"]')) return;
-    if (c.omitirSecretos && pareceSecreto(texto)) { toast('No guardé eso en el historial: parece una contraseña o una clave.', 'aviso'); return; }
+    if (c.omitirSecretos && pareceSecreto(texto)) return;
     const recortado = texto.length > 20000 ? texto.slice(0, 20000) : texto;
     const lista = historial().filter((x) => x.texto !== recortado);
     lista.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), t: Date.now(), texto: recortado, sitio: HOST, titulo: document.title.slice(0, 120), origen });
