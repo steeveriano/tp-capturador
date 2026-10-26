@@ -4,7 +4,7 @@
 
 - El botón del puente pasa a llamarse "Pasar a…" y abre un selector con todas las conversaciones de Hermes y ChatGPT abiertas en el perfil; la emparejada va primero. Se puede elegir entre varias conversaciones de ChatGPT.
 - Alt+P sigue enviando directo a la conversación emparejada.
-- Pruebas del puente: 25 casos, incluido "la otra conversación no recibe nada", con control negativo.
+- Pruebas del puente: 28 casos, incluido "la otra conversación no recibe nada", con control negativo.
 
 Origen: chat https://claude.ai/chat/5658e950-6b45-4967-93af-7c220e4f7d88
 
