@@ -1,6 +1,6 @@
 # Cambios
 
-## 2.2.0 · 2026-10-26 15:20 (Bogotá)
+## 2.2.0 · 2026-10-26 15:15 (Bogotá)
 
 - Lupa: clic derecho › Lupa o Alt+L. Amplía alrededor del cursor; la rueda amplía o reduce entre 1× y 8×; Esc o clic derecho para salir.
 - Botón del puente en Hermes: pasa de la izquierda a la derecha, y su letra vuelve a ser sin serifa.
