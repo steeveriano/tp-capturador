@@ -1,6 +1,6 @@
 # Cambios
 
-## 2.1.0 · 2026-10-26 (Bogotá)
+## 2.1.0 · 2026-10-26 13:40 (Bogotá)
 
 - Puente Hermes ⇄ ChatGPT: botón "Pasar a…" y atajo Alt+P. Lleva la última respuesta, o lo seleccionado, a la caja de la otra pestaña sin enviarla.
 - Hermes se lee por su API (`/api/sessions/{id}/latest-descendant` y `/messages`) y se escribe con un evento de pegado sobre la terminal. Verificado en el Hermes ASUS real: el texto de varias líneas queda en la caja sin enviarse.
