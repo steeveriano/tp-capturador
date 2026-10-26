@@ -1,5 +1,15 @@
 # Cambios
 
+## 2.1.0 · 2026-10-26 (Bogotá)
+
+- Puente Hermes ⇄ ChatGPT: botón "Pasar a…" y atajo Alt+P. Lleva la última respuesta, o lo seleccionado, a la caja de la otra pestaña sin enviarla.
+- Hermes se lee por su API (`/api/sessions/{id}/latest-descendant` y `/messages`) y se escribe con un evento de pegado sobre la terminal. Verificado en el Hermes ASUS real: el texto de varias líneas queda en la caja sin enviarse.
+- Emparejamiento de conversaciones: si la otra pestaña no está abierta, abre la conversación emparejada y pega al cargar.
+- Nueva prueba `tests/puente.mjs` (17 casos, dos pestañas reales) con control negativo.
+- Permisos nuevos: `GM_addValueChangeListener`, `GM_removeValueChangeListener` y `@connect tierraparaiso.net`. Tampermonkey los pide al actualizar.
+
+Origen: chat https://claude.ai/chat/5658e950-6b45-4967-93af-7c220e4f7d88
+
 ## 2.0.0 · 2026-10-26 09:15 (Bogotá)
 
 Reescritura completa del antiguo "Sales TierraParaíso — Capturador de Contactos" v1.2.1.

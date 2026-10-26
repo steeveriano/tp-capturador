@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TP Capturador
 // @namespace    https://github.com/steeveriano/tp-capturador
-// @version      2.0.0
-// @description  Contactos a Google Sheets, menú propio de clic derecho, historial del portapapeles y recorte de zonas de la página.
+// @version      2.1.0
+// @description  Contactos a Google Sheets, menú propio de clic derecho, historial del portapapeles, recorte de zonas y puente Hermes ⇄ ChatGPT.
 // @author       Steeve Riaño · tierraparaiso
 // @homepageURL  https://github.com/steeveriano/tp-capturador
 // @supportURL   https://github.com/steeveriano/tp-capturador/issues
@@ -19,8 +19,11 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_addStyle
 // @grant        GM_openInTab
+// @grant        GM_addValueChangeListener
+// @grant        GM_removeValueChangeListener
 // @connect      script.google.com
 // @connect      script.googleusercontent.com
+// @connect      tierraparaiso.net
 // ==/UserScript==
 
 /*
@@ -33,7 +36,7 @@
   'use strict';
   if (window.top !== window.self) return;
 
-  const VERSION = '2.0.0';
+  const VERSION = '2.1.0';
   const REPO = 'https://github.com/steeveriano/tp-capturador';
   const HOST = location.hostname;
 
@@ -49,6 +52,7 @@
     barraSeleccion: true,  // barra flotante al seleccionar texto
     menuDerecho: true,     // menú propio en clic derecho
     omitirSecretos: true,  // no guardar en historial lo que parezca contraseña o token
+    puenteEncabezado: true, // al pasar entre Hermes y ChatGPT, anteponer "[Respuesta de …]"
   };
   const cfg = () => Object.assign({}, CFG_BASE, GM_getValue('cfg', {}));
   const setCfg = (cambios) => GM_setValue('cfg', Object.assign(cfg(), cambios));
@@ -112,6 +116,13 @@
     .resultado textarea { all: unset; white-space: pre-wrap; background: #1f2937; border-radius: 6px; padding: 8px 10px; min-height: 80px; max-height: 200px; overflow: auto; font-size: 12px; }
     .resultado .acciones { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; border-top: 1px solid #374151; }
     .resultado .acciones button { background: #1f2937; }
+    .puente { all: unset; position: fixed; bottom: 18px; cursor: pointer; display: flex; gap: 10px; align-items: center;
+      padding: 9px 14px; border-radius: 999px; background: #b45309; color: #fff; font-size: 13px; font-weight: 600;
+      box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+    .puente:hover { background: #d97706; }
+    .puente .k { font-weight: 400; opacity: .75; font-size: 11px; }
+    .puente.hermes { left: 70px; }
+    .puente.chatgpt { right: 22px; bottom: 120px; }
   `;
 
   let raiz = null;
@@ -578,6 +589,11 @@
       items.push(sep());
     }
 
+    if (LADO) {
+      items.push(seccion('Puente'));
+      items.push(boton(`Pasar a ${LADOS[OTRO].nombre}` + (sel.trim() ? ' (lo seleccionado)' : ' (última respuesta)'), pasarAlOtro, 'Alt+P'));
+      items.push(sep());
+    }
     items.push(seccion('Página'));
     items.push(boton('Recortar una zona…', iniciarRecorte));
     if (!destino.editable) items.push(boton('Historial del portapapeles', () => abrirHistorial(null), 'Alt+V'));
@@ -776,6 +792,227 @@
     s.appendChild(nodo);
   }
 
+  // ───────────────────────── Puente entre pestañas (Hermes ⇄ ChatGPT) ─────────────────────────
+  // Un clic toma la última respuesta (o lo seleccionado) y la pega en la caja de la otra pestaña.
+  // Nunca envía: la persona revisa y pulsa Enter.
+  const VIVA_MS = 10 * 60e3;
+
+  function getJSON(url) {
+    return new Promise((res, rej) => GM_xmlhttpRequest({
+      method: 'GET', url, timeout: 15000,
+      onload: (r) => {
+        if (r.status !== 200) return rej(new Error('Hermes respondió ' + r.status + '. Recarga la página de Hermes.'));
+        try { res(JSON.parse(r.responseText)); } catch (_) { rej(new Error('Hermes no devolvió datos (¿venció el acceso de Cloudflare? recarga la página).')); }
+      },
+      onerror: () => rej(new Error('sin conexión con Hermes')),
+      ontimeout: () => rej(new Error('Hermes tardó demasiado')),
+    }));
+  }
+
+  async function sesionHermes() {
+    let id = new URLSearchParams(location.search).get('resume');
+    if (!id) {
+      const j = await getJSON(location.origin + '/api/sessions?limit=20');
+      const s = (j.sessions || []).filter((x) => x.message_count > 0)
+        .sort((a, b) => (b.last_activity_at || b.started_at || 0) - (a.last_activity_at || a.started_at || 0))[0];
+      if (!s) throw new Error('No encontré una conversación de Hermes con mensajes.');
+      id = s.id;
+    }
+    try {
+      const d = await getJSON(`${location.origin}/api/sessions/${encodeURIComponent(id)}/latest-descendant`);
+      if (d && d.session_id) id = d.session_id;
+    } catch (_) { /* sin descendiente: se usa la misma */ }
+    return id;
+  }
+
+  async function leerHermes() {
+    const id = await sesionHermes();
+    const j = await getJSON(`${location.origin}/api/sessions/${encodeURIComponent(id)}/messages`);
+    const arr = (j.messages || []).filter((m) => m.role === 'assistant' && typeof m.content === 'string' && m.content.trim());
+    if (!arr.length) throw new Error('Esa conversación de Hermes todavía no tiene respuestas.');
+    arr.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    return arr[arr.length - 1].content.trim();
+  }
+
+  async function leerChatGPT() {
+    if (document.querySelector('[data-testid="stop-button"], button[aria-label*="Detener"], button[aria-label*="Stop streaming"]')) {
+      throw new Error('ChatGPT todavía está escribiendo. Espera a que termine.');
+    }
+    const msgs = document.querySelectorAll('[data-message-author-role="assistant"]');
+    const ult = msgs[msgs.length - 1];
+    if (!ult) throw new Error('No encontré respuestas de ChatGPT en esta pestaña.');
+    return (ult.querySelector('.markdown') || ult).innerText.trim();
+  }
+
+  async function esperarElemento(selectores, ms) {
+    const fin = Date.now() + ms;
+    while (Date.now() < fin) {
+      for (const s of selectores) { const e = document.querySelector(s); if (e) return e; }
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    return null;
+  }
+
+  // Pega como lo haría Ctrl+V: el sitio recibe un evento "paste" con el texto. Sirve para la
+  // terminal de Hermes (xterm) y para el editor de ChatGPT, y respeta los saltos de línea.
+  function pegarPorEvento(el, texto) {
+    el.focus();
+    const dt = new DataTransfer();
+    dt.setData('text/plain', texto);
+    const ev = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true });
+    el.dispatchEvent(ev);
+    return ev.defaultPrevented;
+  }
+
+  async function escribirHermes(texto) {
+    const ta = await esperarElemento(['.xterm-helper-textarea'], 5000);
+    if (!ta) throw new Error('esa pestaña de Hermes no tiene el Chat abierto');
+    if (!pegarPorEvento(ta, texto)) throw new Error('la terminal de Hermes no aceptó el texto');
+  }
+
+  async function escribirChatGPT(texto) {
+    const el = await esperarElemento(['#prompt-textarea', 'div.ProseMirror[contenteditable="true"]', 'form [contenteditable="true"]', 'form textarea'], 5000);
+    if (!el) throw new Error('no encontré la caja de texto de ChatGPT');
+    const largo = () => (el.value !== undefined ? el.value : el.innerText || '').length;
+    const antes = largo();
+    pegarPorEvento(el, texto);
+    await new Promise((r) => setTimeout(r, 200));
+    if (largo() <= antes) {
+      el.focus();
+      if (!document.execCommand('insertText', false, texto)) throw new Error('ChatGPT no aceptó el texto');
+    }
+  }
+
+  const LADOS = {
+    hermes: { nombre: 'Hermes', es: () => /^hermes[\w-]*\.tierraparaiso\.net$/.test(HOST), leer: leerHermes, escribir: escribirHermes },
+    chatgpt: { nombre: 'ChatGPT', es: () => /^(chatgpt\.com|chat\.openai\.com)$/.test(HOST), leer: leerChatGPT, escribir: escribirChatGPT },
+  };
+  const LADO = Object.keys(LADOS).find((k) => LADOS[k].es()) || null;
+  const OTRO = LADO === 'hermes' ? 'chatgpt' : LADO === 'chatgpt' ? 'hermes' : null;
+  const ID_PESTANA = (() => {
+    try {
+      let id = sessionStorage.getItem('tp-pestana');
+      if (!id) { id = Math.random().toString(36).slice(2, 10); sessionStorage.setItem('tp-pestana', id); }
+      return id;
+    } catch (_) { return Math.random().toString(36).slice(2, 10); }
+  })();
+
+  function claveConversacion(url) {
+    try {
+      const u = new URL(url);
+      if (/chatgpt\.com|openai\.com/.test(u.hostname)) return u.hostname + u.pathname;
+      const r = u.searchParams.get('resume');
+      return u.hostname + (r ? '#' + r : u.pathname);
+    } catch (_) { return url; }
+  }
+  const mismaConversacion = (a, b) => !!a && !!b && claveConversacion(a) === claveConversacion(b);
+
+  function presencia(cambios) {
+    const p = GM_getValue('puente:pestanas', {});
+    const ahora = Date.now();
+    for (const [k, v] of Object.entries(p)) if (ahora - v.t > VIVA_MS) delete p[k];
+    if (cambios === null) delete p[ID_PESTANA];
+    else p[ID_PESTANA] = Object.assign(p[ID_PESTANA] || {}, { lado: LADO, url: location.href, titulo: document.title.slice(0, 80), t: ahora }, cambios || {});
+    GM_setValue('puente:pestanas', p);
+  }
+
+  function elegirDestino() {
+    const p = GM_getValue('puente:pestanas', {});
+    const parOtro = (GM_getValue('puente:par', {}) || {})[OTRO];
+    const vivas = Object.entries(p).filter(([id, v]) => v.lado === OTRO && id !== ID_PESTANA && Date.now() - v.t < VIVA_MS);
+    if (!vivas.length) return null;
+    const delPar = vivas.filter(([, v]) => mismaConversacion(v.url, parOtro));
+    const lista = delPar.length ? delPar : vivas;
+    lista.sort((a, b) => (b[1].foco || b[1].t) - (a[1].foco || a[1].t));
+    return lista[0][0];
+  }
+
+  function guardarPar(urlOtro) {
+    if (!urlOtro) return;
+    GM_setValue('puente:par', { [LADO]: location.href, [OTRO]: urlOtro, t: Date.now() });
+  }
+
+  async function pasarAlOtro() {
+    if (!LADO) return;
+    const nombreOtro = LADOS[OTRO].nombre;
+    let texto = seleccionActual().texto.trim();
+    let que = 'lo seleccionado';
+    if (!texto) {
+      try { texto = await LADOS[LADO].leer(); que = 'la última respuesta'; }
+      catch (e) { toast(e.message, 'error'); return; }
+    }
+    if (!texto) { toast('No encontré qué pasar.', 'aviso'); return; }
+    const cuerpo = cfg().puenteEncabezado ? `[Respuesta de ${LADOS[LADO].nombre}]\n\n${texto}` : texto;
+    const msg = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), de: LADO, para: OTRO, texto: cuerpo, url: location.href, t: Date.now() };
+    const destino = elegirDestino();
+    if (!destino) {
+      const parOtro = (GM_getValue('puente:par', {}) || {})[OTRO];
+      if (parOtro) {
+        GM_setValue('puente:pendiente', Object.assign(msg, { destino: null, urlDestino: parOtro }));
+        GM_openInTab(parOtro, { active: true });
+        toast(`Abrí la conversación emparejada de ${nombreOtro}; el texto se pega cuando cargue.`, 'aviso');
+      } else {
+        toast(`No hay ninguna pestaña de ${nombreOtro} abierta en este perfil. Ábrela y vuelve a pulsar.`, 'error');
+      }
+      return;
+    }
+    msg.destino = destino;
+    let respondio = false;
+    const oyente = GM_addValueChangeListener('puente:ack', (_k, _v, ack) => {
+      if (!ack || ack.id !== msg.id) return;
+      respondio = true;
+      GM_removeValueChangeListener(oyente);
+      if (ack.ok) { guardarPar(ack.url); toast(`Pegué ${que} en ${nombreOtro}. Ve a esa pestaña, revisa y pulsa Enter.`, 'ok'); }
+      else toast(`${nombreOtro} no pudo pegarlo: ${ack.error}.`, 'error');
+    });
+    setTimeout(() => {
+      if (respondio) return;
+      GM_removeValueChangeListener(oyente);
+      toast(`La pestaña de ${nombreOtro} no respondió. Haz clic una vez en ella (Chrome la tenía dormida) y repite.`, 'error');
+    }, 9000);
+    GM_setValue('puente:mensaje', msg);
+  }
+
+  async function recibir(msg) {
+    let ack;
+    try {
+      await LADOS[LADO].escribir(msg.texto);
+      ack = { id: msg.id, ok: true, url: location.href };
+      toast(`Llegó texto de ${LADOS[msg.de].nombre}. Revisa y pulsa Enter para enviarlo.`, 'ok');
+    } catch (e) {
+      ack = { id: msg.id, ok: false, error: e.message };
+    }
+    GM_setValue('puente:ack', ack);
+    return ack;
+  }
+
+  let botonPuente = null;
+  function iniciarPuente() {
+    if (!LADO) return;
+    presencia({ foco: document.hasFocus() ? Date.now() : 0 });
+    setInterval(() => { if (!document.hidden) presencia(); }, 30000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) presencia({ foco: Date.now() }); });
+    window.addEventListener('focus', () => presencia({ foco: Date.now() }));
+    window.addEventListener('pagehide', () => presencia(null));
+
+    GM_addValueChangeListener('puente:mensaje', (_k, _v, msg) => {
+      if (msg && msg.para === LADO && msg.destino === ID_PESTANA) recibir(msg);
+    });
+
+    const pend = GM_getValue('puente:pendiente', null);
+    if (pend && pend.para === LADO && Date.now() - pend.t < 120000 && mismaConversacion(pend.urlDestino, location.href)) {
+      GM_setValue('puente:pendiente', null);
+      setTimeout(async () => { const a = await recibir(pend); if (a.ok) GM_setValue('puente:par', { [LADO]: location.href, [pend.de]: pend.url, t: Date.now() }); }, 1500);
+    }
+
+    const s = ui();
+    botonPuente = h('button', {
+      class: 'puente ' + LADO, title: 'Pasa la última respuesta (o lo seleccionado) a la otra pestaña, sin enviar. Atajo: Alt+P',
+      on: { click: (e) => { e.stopPropagation(); pasarAlOtro(); } },
+    }, `Pasar a ${LADOS[OTRO].nombre}`, h('span', { class: 'k' }, 'Alt+P'));
+    s.appendChild(botonPuente);
+  }
+
   // ───────────────────────── Activación y comandos ─────────────────────────
   function revisarActivacion() {
     if (HOST !== 'github.com' || !location.pathname.toLowerCase().startsWith('/steeveriano/tp-capturador')) return;
@@ -822,6 +1059,13 @@
     GM_registerMenuCommand((c.resaltar ? 'Apagar' : 'Encender') + ' resaltado de contactos', () => { setCfg({ resaltar: !cfg().resaltar }); location.reload(); });
     GM_registerMenuCommand((c.barraSeleccion ? 'Apagar' : 'Encender') + ' barra al seleccionar', () => setCfg({ barraSeleccion: !cfg().barraSeleccion }));
     GM_registerMenuCommand((c.menuDerecho ? 'Apagar' : 'Encender') + ' menú de clic derecho', () => setCfg({ menuDerecho: !cfg().menuDerecho }));
+    if (LADO) {
+      GM_registerMenuCommand(`Pasar a ${LADOS[OTRO].nombre} (Alt+P)`, pasarAlOtro);
+      const par = GM_getValue('puente:par', null);
+      if (par && par[OTRO]) GM_registerMenuCommand(`Abrir la conversación emparejada de ${LADOS[OTRO].nombre}`, () => GM_openInTab(par[OTRO], { active: true }));
+      if (par) GM_registerMenuCommand('Olvidar el emparejamiento Hermes ⇄ ChatGPT', () => { GM_setValue('puente:par', null); toast('Emparejamiento borrado.', 'ok'); });
+      GM_registerMenuCommand((c.puenteEncabezado ? 'Quitar' : 'Poner') + ' el encabezado "[Respuesta de …]" al pasar', () => setCfg({ puenteEncabezado: !cfg().puenteEncabezado }));
+    }
     GM_registerMenuCommand('Configurar a mano', configurarAMano);
     GM_registerMenuCommand('Pedir un cambio a Claude Code', pedirCambio);
     GM_registerMenuCommand(`Versión ${VERSION} · perfil: ${c.perfil || 'sin activar'}`, () => GM_openInTab(REPO, { active: true }));
@@ -833,6 +1077,7 @@
   if (sitioDesactivado()) return;
 
   if (cfg().resaltar) iniciarResaltado();
+  iniciarPuente();
 
   window.addEventListener('contextmenu', (e) => {
     if (!cfg().menuDerecho || e.defaultPrevented || esDeLaUI(e)) return; // el sitio tiene menú propio, o es nuestra UI
@@ -862,6 +1107,11 @@
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && abierto) { cerrar(); return; }
+    if (LADO && e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyP') {
+      e.preventDefault(); e.stopPropagation();
+      pasarAlOtro();
+      return;
+    }
     if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyV') {
       e.preventDefault(); e.stopPropagation();
       abrirHistorial(capturarDestino(document.activeElement));
