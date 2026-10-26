@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TP Capturador
 // @namespace    https://github.com/steeveriano/tp-capturador
-// @version      2.2.0
+// @version      2.3.0
 // @description  Contactos a Google Sheets, menú propio de clic derecho, historial del portapapeles, recorte de zonas y puente Hermes ⇄ ChatGPT.
 // @author       Steeve Riaño · tierraparaiso
 // @homepageURL  https://github.com/steeveriano/tp-capturador
@@ -36,7 +36,7 @@
   'use strict';
   if (window.top !== window.self) return;
 
-  const VERSION = '2.2.0';
+  const VERSION = '2.3.0';
   const REPO = 'https://github.com/steeveriano/tp-capturador';
   const HOST = location.hostname;
 
@@ -592,7 +592,8 @@
 
     if (LADO) {
       items.push(seccion('Puente'));
-      items.push(boton(`Pasar a ${LADOS[OTRO].nombre}` + (sel.trim() ? ' (lo seleccionado)' : ' (última respuesta)'), pasarAlOtro, 'Alt+P'));
+      items.push(boton('Pasar a… ' + (sel.trim() ? '(lo seleccionado)' : '(última respuesta)'), () => elegirChat(x, y)));
+      items.push(boton(`Pasar directo a ${LADOS[OTRO].nombre} emparejado`, pasarRapido, 'Alt+P'));
       items.push(sep());
     }
     items.push(seccion('Página'));
@@ -960,70 +961,108 @@
   }
   const mismaConversacion = (a, b) => !!a && !!b && claveConversacion(a) === claveConversacion(b);
 
+  function tituloConversacion() {
+    if (LADO === 'hermes') {
+      const h1 = document.querySelector('header h1, main h1, h1');
+      const t = h1 && h1.innerText.trim();
+      const r = new URLSearchParams(location.search).get('resume');
+      return (t && !/^chat$/i.test(t) ? t : 'Chat') + (r ? ' · ' + r.slice(-6) : '');
+    }
+    return document.title.replace(/\s*[-|·]\s*ChatGPT\s*$/i, '').trim() || 'ChatGPT';
+  }
+
   function presencia(cambios) {
     const p = GM_getValue('puente:pestanas', {});
     const ahora = Date.now();
     for (const [k, v] of Object.entries(p)) if (ahora - v.t > VIVA_MS) delete p[k];
     if (cambios === null) delete p[ID_PESTANA];
-    else p[ID_PESTANA] = Object.assign(p[ID_PESTANA] || {}, { lado: LADO, url: location.href, titulo: document.title.slice(0, 80), t: ahora }, cambios || {});
+    else p[ID_PESTANA] = Object.assign(p[ID_PESTANA] || {}, { lado: LADO, url: location.href, titulo: tituloConversacion().slice(0, 80), t: ahora }, cambios || {});
     GM_setValue('puente:pestanas', p);
   }
 
-  function elegirDestino() {
+  // Todas las conversaciones abiertas en otras pestañas de este perfil (Hermes y ChatGPT),
+  // primero la emparejada y luego la última que tuvo el foco.
+  function candidatos() {
     const p = GM_getValue('puente:pestanas', {});
-    const parOtro = (GM_getValue('puente:par', {}) || {})[OTRO];
-    const vivas = Object.entries(p).filter(([id, v]) => v.lado === OTRO && id !== ID_PESTANA && Date.now() - v.t < VIVA_MS);
-    if (!vivas.length) return null;
-    const delPar = vivas.filter(([, v]) => mismaConversacion(v.url, parOtro));
-    const lista = delPar.length ? delPar : vivas;
-    lista.sort((a, b) => (b[1].foco || b[1].t) - (a[1].foco || a[1].t));
-    return lista[0][0];
+    const par = GM_getValue('puente:par', {}) || {};
+    return Object.entries(p)
+      .filter(([id, v]) => id !== ID_PESTANA && LADOS[v.lado] && Date.now() - v.t < VIVA_MS)
+      .map(([id, v]) => Object.assign({ id, emparejada: mismaConversacion(v.url, par[v.lado]) && v.lado !== LADO }, v))
+      .sort((a, b) => (b.emparejada - a.emparejada) || ((b.lado === OTRO) - (a.lado === OTRO)) || ((b.foco || b.t) - (a.foco || a.t)));
   }
 
-  function guardarPar(urlOtro) {
-    if (!urlOtro) return;
-    GM_setValue('puente:par', { [LADO]: location.href, [OTRO]: urlOtro, t: Date.now() });
+  function guardarPar(ladoDestino, urlDestino) {
+    if (!urlDestino || ladoDestino === LADO) return;
+    GM_setValue('puente:par', { [LADO]: location.href, [ladoDestino]: urlDestino, t: Date.now() });
   }
 
-  async function pasarAlOtro() {
-    if (!LADO) return;
-    const nombreOtro = LADOS[OTRO].nombre;
+  async function textoAPasar() {
     let texto = seleccionActual().texto.trim();
     let que = 'lo seleccionado';
     if (!texto) {
-      try { texto = await LADOS[LADO].leer(); que = 'la última respuesta'; }
-      catch (e) { toast(e.message, 'error'); return; }
+      texto = await LADOS[LADO].leer();
+      que = 'la última respuesta';
     }
-    if (!texto) { toast('No encontré qué pasar.', 'aviso'); return; }
+    if (!texto) throw new Error('No encontré qué pasar.');
     const cuerpo = cfg().puenteEncabezado ? `[Respuesta de ${LADOS[LADO].nombre}]\n\n${texto}` : texto;
-    const msg = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), de: LADO, para: OTRO, texto: cuerpo, url: location.href, t: Date.now() };
-    const destino = elegirDestino();
-    if (!destino) {
-      const parOtro = (GM_getValue('puente:par', {}) || {})[OTRO];
-      if (parOtro) {
-        GM_setValue('puente:pendiente', Object.assign(msg, { destino: null, urlDestino: parOtro }));
-        GM_openInTab(parOtro, { active: true });
-        toast(`Abrí la conversación emparejada de ${nombreOtro}; el texto se pega cuando cargue.`, 'aviso');
-      } else {
-        toast(`No hay ninguna pestaña de ${nombreOtro} abierta en este perfil. Ábrela y vuelve a pulsar.`, 'error');
-      }
+    return { cuerpo, que };
+  }
+
+  async function enviarA(dest) {
+    let t;
+    try { t = await textoAPasar(); } catch (e) { toast(e.message, 'error'); return; }
+    const nombre = `${LADOS[dest.lado].nombre} «${dest.titulo}»`;
+    const msg = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), de: LADO, para: dest.lado, texto: t.cuerpo, url: location.href, t: Date.now() };
+    if (dest.abrir) {
+      GM_setValue('puente:pendiente', Object.assign(msg, { destino: null, urlDestino: dest.url }));
+      GM_openInTab(dest.url, { active: true });
+      toast(`Abrí ${nombre}; el texto se pega cuando cargue.`, 'aviso');
       return;
     }
-    msg.destino = destino;
+    msg.destino = dest.id;
     let respondio = false;
     const oyente = GM_addValueChangeListener('puente:ack', (_k, _v, ack) => {
       if (!ack || ack.id !== msg.id) return;
       respondio = true;
       GM_removeValueChangeListener(oyente);
-      if (ack.ok) { guardarPar(ack.url); toast(`Pegué ${que} en ${nombreOtro}. Ve a esa pestaña, revisa y pulsa Enter.`, 'ok'); }
-      else toast(`${nombreOtro} no pudo pegarlo: ${ack.error}.`, 'error');
+      if (ack.ok) { guardarPar(dest.lado, ack.url); toast(`Pegué ${t.que} en ${nombre}. Ve a esa pestaña, revisa y pulsa Enter.`, 'ok'); }
+      else toast(`${nombre} no pudo pegarlo: ${ack.error}.`, 'error');
     });
     setTimeout(() => {
       if (respondio) return;
       GM_removeValueChangeListener(oyente);
-      toast(`La pestaña de ${nombreOtro} no respondió. Haz clic una vez en ella (Chrome la tenía dormida) y repite.`, 'error');
+      toast(`${nombre} no respondió. Haz clic una vez en esa pestaña (Chrome la tenía dormida) y repite.`, 'error');
     }, 9000);
     GM_setValue('puente:mensaje', msg);
+  }
+
+  // Alt+P: directo a la conversación emparejada o a la última usada del otro lado.
+  function pasarRapido() {
+    if (!LADO) return;
+    const c = candidatos().find((x) => x.lado === OTRO);
+    if (c) { enviarA(c); return; }
+    const parOtro = (GM_getValue('puente:par', {}) || {})[OTRO];
+    if (parOtro) { enviarA({ lado: OTRO, url: parOtro, titulo: 'emparejada', abrir: true }); return; }
+    toast(`No hay ninguna pestaña de ${LADOS[OTRO].nombre} abierta en este perfil. Ábrela y vuelve a pulsar.`, 'error');
+  }
+
+  // Botón: muestra a qué conversación enviar.
+  function elegirChat(x, y) {
+    if (!LADO) return;
+    const lista = candidatos();
+    const par = GM_getValue('puente:par', {}) || {};
+    const items = [seccion('Pasar a…'), h('div', { class: 'valor' }, seleccionActual().texto.trim() ? 'Lo seleccionado' : 'La última respuesta de esta pestaña')];
+    for (const c of lista) {
+      items.push(h('button', { on: { click: (e) => { e.stopPropagation(); cerrar(); enviarA(c); } } },
+        h('span', null, `${LADOS[c.lado].nombre} · ${c.titulo}`),
+        h('span', { class: 'k' }, c.emparejada ? 'emparejada' : c.lado === LADO ? 'mismo tipo' : '')));
+    }
+    if (par[OTRO] && !lista.some((c) => c.lado === OTRO && mismaConversacion(c.url, par[OTRO]))) {
+      items.push(boton(`Abrir la emparejada de ${LADOS[OTRO].nombre} y pegar ahí`, () => enviarA({ lado: OTRO, url: par[OTRO], titulo: 'emparejada', abrir: true })));
+    }
+    if (!lista.length && !par[OTRO]) items.push(h('div', { class: 'pie' }, `No hay otra conversación de Hermes o ChatGPT abierta en este perfil de Chrome.`));
+    items.push(h('div', { class: 'pie' }, 'Alt+P envía directo a la emparejada. Nada se envía solo: revisas y pulsas Enter.'));
+    abrir(h('div', { class: 'menu' }, items), x, y, 'contextual');
   }
 
   async function recibir(msg) {
@@ -1055,14 +1094,17 @@
     const pend = GM_getValue('puente:pendiente', null);
     if (pend && pend.para === LADO && Date.now() - pend.t < 120000 && mismaConversacion(pend.urlDestino, location.href)) {
       GM_setValue('puente:pendiente', null);
-      setTimeout(async () => { const a = await recibir(pend); if (a.ok) GM_setValue('puente:par', { [LADO]: location.href, [pend.de]: pend.url, t: Date.now() }); }, 1500);
+      setTimeout(async () => {
+        const a = await recibir(pend);
+        if (a.ok && pend.de !== LADO) GM_setValue('puente:par', { [LADO]: location.href, [pend.de]: pend.url, t: Date.now() });
+      }, 1500);
     }
 
     const s = ui();
     botonPuente = h('button', {
-      class: 'puente ' + LADO, title: 'Pasa la última respuesta (o lo seleccionado) a la otra pestaña, sin enviar. Atajo: Alt+P',
-      on: { click: (e) => { e.stopPropagation(); pasarAlOtro(); } },
-    }, `Pasar a ${LADOS[OTRO].nombre}`, h('span', { class: 'k' }, 'Alt+P'));
+      class: 'puente ' + LADO, title: 'Elige a qué conversación pasar la última respuesta (o lo seleccionado). Alt+P: directo a la emparejada.',
+      on: { click: (e) => { e.stopPropagation(); const r = botonPuente.getBoundingClientRect(); elegirChat(r.left, r.top - 10); } },
+    }, 'Pasar a…', h('span', { class: 'k' }, 'Alt+P'));
     s.appendChild(botonPuente);
   }
 
@@ -1114,7 +1156,7 @@
     GM_registerMenuCommand((c.barraSeleccion ? 'Apagar' : 'Encender') + ' barra al seleccionar', () => setCfg({ barraSeleccion: !cfg().barraSeleccion }));
     GM_registerMenuCommand((c.menuDerecho ? 'Apagar' : 'Encender') + ' menú de clic derecho', () => setCfg({ menuDerecho: !cfg().menuDerecho }));
     if (LADO) {
-      GM_registerMenuCommand(`Pasar a ${LADOS[OTRO].nombre} (Alt+P)`, pasarAlOtro);
+      GM_registerMenuCommand(`Pasar directo a ${LADOS[OTRO].nombre} emparejado (Alt+P)`, pasarRapido);
       const par = GM_getValue('puente:par', null);
       if (par && par[OTRO]) GM_registerMenuCommand(`Abrir la conversación emparejada de ${LADOS[OTRO].nombre}`, () => GM_openInTab(par[OTRO], { active: true }));
       if (par) GM_registerMenuCommand('Olvidar el emparejamiento Hermes ⇄ ChatGPT', () => { GM_setValue('puente:par', null); toast('Emparejamiento borrado.', 'ok'); });
@@ -1168,7 +1210,7 @@
     }
     if (LADO && e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyP') {
       e.preventDefault(); e.stopPropagation();
-      pasarAlOtro();
+      pasarRapido();
       return;
     }
     if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyV') {

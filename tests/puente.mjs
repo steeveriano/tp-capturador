@@ -13,8 +13,9 @@ const H2C = readFileSync(require.resolve('html2canvas/dist/html2canvas.min.js'),
 const SESION = 'local-abc123';
 const URL_HERMES = `https://hermes-asus.tierraparaiso.net/chat?profile=default&resume=${SESION}`;
 const URL_CHATGPT = 'https://chatgpt.com/c/conversacion-1';
+const URL_CHATGPT2 = 'https://chatgpt.com/c/conversacion-2';
 
-const PAGINA_HERMES = `<!doctype html><html><head><title>Hermes Agent - Dashboard</title></head><body style="background:#000;color:#0f0">
+const PAGINA_HERMES = `<!doctype html><html><head><meta charset="utf-8"><title>Hermes Agent - Dashboard</title></head><body style="background:#000;color:#0f0">
   <div class="xterm"><textarea class="xterm-helper-textarea"></textarea><canvas></canvas></div>
   <script>
     window.__pegado = [];
@@ -23,7 +24,7 @@ const PAGINA_HERMES = `<!doctype html><html><head><title>Hermes Agent - Dashboar
     });
   </script></body></html>`;
 
-const PAGINA_CHATGPT = `<!doctype html><html><head><title>ChatGPT</title></head><body>
+const PAGINA_CHATGPT = (titulo) => `<!doctype html><html><head><meta charset="utf-8"><title>${titulo} - ChatGPT</title></head><body>
   <main>
     <div data-message-author-role="user"><div>Pregunta vieja</div></div>
     <div data-message-author-role="assistant"><div class="markdown">Respuesta vieja de ChatGPT</div></div>
@@ -67,7 +68,7 @@ await ctx.route('https://hermes-asus.tierraparaiso.net/**', (r) => {
   if (u.pathname === `/api/sessions/${SESION}/messages`) return r.fulfill({ json: MENSAJES });
   return r.fulfill({ contentType: 'text/html', body: PAGINA_HERMES });
 });
-await ctx.route('https://chatgpt.com/**', (r) => r.fulfill({ contentType: 'text/html', body: PAGINA_CHATGPT }));
+await ctx.route('https://chatgpt.com/**', (r) => r.fulfill({ contentType: 'text/html', body: PAGINA_CHATGPT(r.request().url().endsWith('-2') ? 'Revisión contrato' : 'Plan de respaldos') }));
 
 const SHIM = (mem) => `
   (() => {
@@ -102,6 +103,12 @@ async function abrir(url) {
 }
 const textos = (p, sel) => p.evaluate((s) => [...window.__sombra.querySelectorAll(s)].map((n) => n.textContent), sel);
 const clicBoton = (p) => p.evaluate(() => window.__sombra.querySelector('.puente').click());
+async function pasar(p, item) {
+  await clicBoton(p);
+  await p.waitForTimeout(100);
+  const hecho = await p.evaluate((t) => { const b = [...window.__sombra.querySelectorAll('.menu button')].find((x) => x.textContent.includes(t)); if (!b) return false; b.click(); return true; }, item);
+  ok(hecho, `el selector ofrece "${item}"`);
+}
 const promptChatGPT = (p) => p.evaluate(() => document.querySelector('#prompt-textarea').innerText);
 
 const hermes = await abrir(URL_HERMES);
@@ -109,27 +116,27 @@ const chatgpt = await abrir(URL_CHATGPT);
 await hermes.bringToFront();
 await hermes.evaluate(() => window.dispatchEvent(new Event('focus')));
 
-ok((await textos(hermes, '.puente'))[0]?.startsWith('Pasar a ChatGPT'), 'Hermes muestra el botón "Pasar a ChatGPT"');
-ok((await textos(chatgpt, '.puente'))[0]?.startsWith('Pasar a Hermes'), 'ChatGPT muestra el botón "Pasar a Hermes"');
+ok((await textos(hermes, '.puente'))[0]?.startsWith('Pasar a…'), 'Hermes muestra el botón "Pasar a…"');
+ok((await textos(chatgpt, '.puente'))[0]?.startsWith('Pasar a…'), 'ChatGPT muestra el botón "Pasar a…"');
 
 const lado = await hermes.evaluate(() => { const r = window.__sombra.querySelector('.puente').getBoundingClientRect(); return { derecha: innerWidth - r.right, fuente: getComputedStyle(window.__sombra.querySelector('.puente')).fontFamily }; });
 ok(lado.derecha < 40, 'en Hermes el botón está a la derecha');
 ok(!/^(serif|"?Times)/i.test(lado.fuente), 'el botón usa letra sin serifa');
 
 // 1. Hermes → ChatGPT: última respuesta con texto, por la API de la sesión del enlace
-await clicBoton(hermes);
+await pasar(hermes, 'ChatGPT · Plan de respaldos');
 await hermes.waitForTimeout(800);
 const enChatGPT = await promptChatGPT(chatgpt);
 ok(enChatGPT.includes('[Respuesta de Hermes]') && enChatGPT.includes('Respuesta final de Hermes') && enChatGPT.includes('- punto B'), 'la última respuesta de Hermes llega completa a la caja de ChatGPT');
 ok(!enChatGPT.includes('Respuesta intermedia'), 'no mezcla respuestas anteriores');
-ok((await textos(hermes, '.toast')).some((t) => t.includes('Pegué la última respuesta en ChatGPT')), 'Hermes confirma que ChatGPT recibió el texto');
+ok((await textos(hermes, '.toast')).some((t) => t.includes('Pegué la última respuesta en ChatGPT «Plan de respaldos»')), 'Hermes confirma qué conversación de ChatGPT recibió el texto');
 ok((await textos(chatgpt, '.toast')).some((t) => t.includes('Llegó texto de Hermes')), 'ChatGPT avisa que llegó texto');
 const par = memoria['puente:par'];
 ok(par && par.hermes === URL_HERMES && par.chatgpt === URL_CHATGPT, 'queda emparejada la conversación de Hermes con la de ChatGPT');
 
 // 2. ChatGPT → Hermes: última respuesta, pegada en la terminal sin enviar
 await chatgpt.evaluate(() => window.dispatchEvent(new Event('focus')));
-await clicBoton(chatgpt);
+await pasar(chatgpt, 'Hermes · Chat');
 await chatgpt.waitForTimeout(800);
 const enHermes = await hermes.evaluate(() => window.__pegado.at(-1) || '');
 ok(enHermes.startsWith('[Respuesta de ChatGPT]') && enHermes.includes('Plan final:') && enHermes.includes('2. Llamar'), 'la última respuesta de ChatGPT llega a la terminal de Hermes');
@@ -144,7 +151,7 @@ ok((await hermes.evaluate(() => window.__pegado.at(-1))) === '[Respuesta de Chat
 // 4. ChatGPT todavía escribiendo: no pasa nada a medias
 await chatgpt.evaluate(() => { getSelection().removeAllRanges(); const b = document.createElement('button'); b.dataset.testid = 'stop-button'; document.body.append(b); });
 const antes = await hermes.evaluate(() => window.__pegado.length);
-await clicBoton(chatgpt);
+await pasar(chatgpt, 'Hermes · Chat');
 await chatgpt.waitForTimeout(500);
 ok((await hermes.evaluate(() => window.__pegado.length)) === antes, 'mientras ChatGPT escribe, no se pasa nada');
 ok((await textos(chatgpt, '.toast')).some((t) => t.includes('todavía está escribiendo')), 'avisa que ChatGPT todavía está escribiendo');
@@ -153,7 +160,7 @@ await chatgpt.evaluate(() => document.querySelector('[data-testid="stop-button"]
 // 5. Sin la otra pestaña abierta: abre la conversación emparejada y deja el texto pendiente
 await hermes.evaluate(() => window.dispatchEvent(new Event('pagehide')));
 await hermes.waitForTimeout(200);
-await clicBoton(chatgpt);
+await pasar(chatgpt, 'Abrir la emparejada de Hermes');
 await chatgpt.waitForTimeout(600);
 ok((await chatgpt.evaluate(() => window.__tabs || [])).includes(URL_HERMES), 'si Hermes no está abierto, abre la conversación emparejada');
 ok(memoria['puente:pendiente']?.para === 'hermes', 'el texto queda pendiente para cuando cargue Hermes');
@@ -163,7 +170,26 @@ await hermes2.waitForTimeout(2200);
 ok((await hermes2.evaluate(() => window.__pegado.at(-1) || '')).includes('Plan final:'), 'la pestaña de Hermes que se abre recibe el texto pendiente');
 ok(!memoria['puente:pendiente'], 'el pendiente se consume una sola vez');
 
-// 6. Otros sitios no muestran el botón
+// 6. Con dos conversaciones de ChatGPT abiertas, se elige cuál recibe
+const chatgpt2 = await abrir(URL_CHATGPT2);
+await hermes2.evaluate(() => window.dispatchEvent(new Event('focus')));
+await clicBoton(hermes2);
+await hermes2.waitForTimeout(100);
+const opciones = await textos(hermes2, '.menu button');
+ok(opciones.some((t) => t.includes('Plan de respaldos') && t.includes('emparejada')) && opciones.some((t) => t.includes('Revisión contrato')), 'el selector lista las dos conversaciones de ChatGPT y marca la emparejada');
+await hermes2.keyboard.press('Escape');
+const antes1 = await promptChatGPT(chatgpt);
+await pasar(hermes2, 'ChatGPT · Revisión contrato');
+await hermes2.waitForTimeout(800);
+ok((await promptChatGPT(chatgpt2)).includes('Respuesta final de Hermes'), 'la conversación elegida recibe el texto');
+ok((await promptChatGPT(chatgpt)) === antes1, 'la otra conversación de ChatGPT no recibe nada');
+
+// 7. Alt+P va directo a la emparejada (ahora la recién elegida), sin preguntar
+await hermes2.keyboard.press('Alt+p');
+await hermes2.waitForTimeout(800);
+ok(((await promptChatGPT(chatgpt2)).match(/Respuesta final de Hermes/g) || []).length === 2, 'Alt+P envía directo a la conversación emparejada');
+
+// 8. Otros sitios no muestran el botón
 const otro = await ctx.newPage(); paginas.add(otro);
 await ctx.route('https://prueba.local/**', (r) => r.fulfill({ contentType: 'text/html', body: '<html><body>nada</body></html>' }));
 await otro.goto('https://prueba.local/'); await otro.evaluate(SHIM(memoria)); await otro.evaluate(H2C); await otro.evaluate(SCRIPT); await otro.waitForTimeout(200);

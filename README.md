@@ -6,7 +6,7 @@ Herramienta personal para Chrome, sobre Tampermonkey. Funciona en todos los siti
 - **Clic derecho propio:** copiar, cortar, pegar lo último, pegar del historial, recortar, guardar en la hoja. Un segundo clic derecho (o Ctrl+clic derecho) abre el menú normal de Chrome. Los sitios con menú propio, como Google Docs o Maps, conservan el suyo.
 - **Barra al seleccionar texto:** Copiar · Cortar · Guardar · WhatsApp · Buscar · Recortar.
 - **Historial del portapapeles:** guarda lo que copias durante 24 horas, solo en ese perfil de Chrome. Se abre con **Alt+V**. No guarda lo que parezca una contraseña o una clave.
-- **Puente Hermes ⇄ ChatGPT:** en Hermes (`hermes*.tierraparaiso.net`) y en ChatGPT aparece el botón naranja **Pasar a ChatGPT** / **Pasar a Hermes** (atajo **Alt+P**). Toma la última respuesta, o lo que tengas seleccionado, y lo pega en la caja de la otra pestaña. **No envía**: tú revisas y pulsas Enter.
+- **Puente Hermes ⇄ ChatGPT:** en Hermes (`hermes*.tierraparaiso.net`) y en ChatGPT aparece el botón naranja **Pasar a…**. Muestra las conversaciones de Hermes y ChatGPT abiertas en el perfil y tú eliges a cuál va. **Alt+P** envía directo a la emparejada. Toma la última respuesta, o lo que tengas seleccionado, y lo pega en la caja de la conversación elegida. **No envía**: tú revisas y pulsas Enter.
 - **Lupa:** clic derecho › *Lupa* (o **Alt+L**). La página se amplía alrededor del cursor; la rueda del mouse amplía o reduce (de 1× a 8×) y al mover el mouse recorres la página. Los clics siguen funcionando. **Esc** o clic derecho para salir. Para ver nítido algo que vas a leer largo rato, Ctrl + rueda (zoom propio de Chrome) se ve más definido.
 - **Recortar una zona:** arrastras un recuadro y obtienes la imagen y el texto de esa parte de la página.
 
@@ -29,7 +29,8 @@ Si hay un script viejo "Sales TierraParaíso — Capturador de Contactos", **hay
 - Funciona entre pestañas **del mismo perfil de Chrome**, en una o en dos ventanas.
 - **Hermes:** lee la respuesta por la API del propio Hermes, de la conversación del enlace (`?resume=…`). Si la pestaña no tiene ese parámetro, toma la conversación con actividad más reciente. Pega en la terminal del Chat como un Ctrl+V; con varias líneas no se envía sola.
 - **ChatGPT:** lee el último mensaje de ChatGPT de la pestaña. Si ChatGPT todavía está escribiendo, no pasa nada y te avisa.
-- **Emparejamiento:** cada vez que un paso sale bien, quedan guardadas las dos conversaciones (Hermes y ChatGPT). Si después pulsas el botón y la otra pestaña no está abierta, abre la conversación emparejada y pega el texto cuando carga. En el menú de Tampermonkey están *Abrir la conversación emparejada* y *Olvidar el emparejamiento*.
+- **Elegir destino:** el botón lista todas las conversaciones abiertas de Hermes y de ChatGPT (incluso dos ChatGPT distintos), con la emparejada primero.
+- **Emparejamiento:** cada vez que un paso entre Hermes y ChatGPT sale bien, quedan guardadas esas dos conversaciones. Alt+P usa esa pareja. Si después pulsas el botón y la otra pestaña no está abierta, abre la conversación emparejada y pega el texto cuando carga. En el menú de Tampermonkey están *Abrir la conversación emparejada* y *Olvidar el emparejamiento*.
 - Por defecto antepone `[Respuesta de Hermes]` o `[Respuesta de ChatGPT]` para que la otra IA sepa de dónde viene. Se quita desde el menú de Tampermonkey.
 - Si Chrome tenía dormida la otra pestaña, avisa que no respondió: un clic en esa pestaña y se repite.
 
