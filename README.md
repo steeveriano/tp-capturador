@@ -14,7 +14,9 @@ Cada perfil de Chrome (cada cuenta de Google con su propia ventana) se instala a
 
 1. **Tampermonkey:** instalarlo desde la [Chrome Web Store](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo). Después: clic derecho en su ícono › *Administrar extensión* › encender **Permitir secuencias de comandos de usuario** (*Allow User Scripts*). Sin ese interruptor no corre nada.
 2. **El script:** abrir [este enlace](https://raw.githubusercontent.com/steeveriano/tp-capturador/main/tp-capturador.user.js) y pulsar **Instalar**.
-3. **La activación:** abrir el *enlace de activación*, aceptar y escribir el nombre del perfil. El enlace está en la bóveda local del portátil con el nombre `tp_capturador_enlace_activacion` (se abre con `python boveda.py`; detalle en `gestion-data/_herramientas/BOVEDA.md`). Lleva la clave adentro: no se pega en chats ni en correos.
+3. **La activación:** abrir el *enlace de activación*, aceptar y escribir el nombre del perfil. El enlace está en la bóveda local del portátil con el nombre `tp_capturador_enlace_activacion` (se abre con `python boveda.py`; detalle en `gestion-data/_herramientas/BOVEDA.md`). Lleva la clave adentro: no se pega en chats ni en correos. Atajo en el portátil: con la ventana del perfil al frente, doble clic en `_herramientas/activar_tp_capturador.bat`; abre el enlace sin mostrar la clave.
+
+   **Cómo saber si quedó activado:** ícono de Tampermonkey › la última línea debe decir `Versión 2.0.0 · perfil: <nombre>`. Si dice `sin activar`, el resaltado y los menús funcionan, pero nada llega a la hoja.
 
 Las actualizaciones llegan solas: Tampermonkey revisa este repositorio y se instala la versión nueva.
 
