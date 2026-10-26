@@ -1,5 +1,13 @@
 # Cambios
 
+## 2.2.0 · 2026-10-26 15:20 (Bogotá)
+
+- Lupa: clic derecho › Lupa o Alt+L. Amplía alrededor del cursor; la rueda amplía o reduce entre 1× y 8×; Esc o clic derecho para salir.
+- Botón del puente en Hermes: pasa de la izquierda a la derecha, y su letra vuelve a ser sin serifa.
+- Pruebas: 8 casos nuevos de lupa y 2 de posición del botón, con control negativo.
+
+Origen: chat https://claude.ai/chat/5658e950-6b45-4967-93af-7c220e4f7d88
+
 ## 2.1.0 · 2026-10-26 13:40 (Bogotá)
 
 - Puente Hermes ⇄ ChatGPT: botón "Pasar a…" y atajo Alt+P. Lleva la última respuesta, o lo seleccionado, a la caja de la otra pestaña sin enviarla.

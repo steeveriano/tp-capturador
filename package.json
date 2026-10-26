@@ -1,6 +1,6 @@
 {
   "name": "tp-capturador",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "description": "Userscript de Tampermonkey: contactos a Google Sheets, menú de clic derecho, historial del portapapeles y recorte.",
   "type": "module",

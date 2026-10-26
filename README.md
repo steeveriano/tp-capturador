@@ -7,6 +7,7 @@ Herramienta personal para Chrome, sobre Tampermonkey. Funciona en todos los siti
 - **Barra al seleccionar texto:** Copiar · Cortar · Guardar · WhatsApp · Buscar · Recortar.
 - **Historial del portapapeles:** guarda lo que copias durante 24 horas, solo en ese perfil de Chrome. Se abre con **Alt+V**. No guarda lo que parezca una contraseña o una clave.
 - **Puente Hermes ⇄ ChatGPT:** en Hermes (`hermes*.tierraparaiso.net`) y en ChatGPT aparece el botón naranja **Pasar a ChatGPT** / **Pasar a Hermes** (atajo **Alt+P**). Toma la última respuesta, o lo que tengas seleccionado, y lo pega en la caja de la otra pestaña. **No envía**: tú revisas y pulsas Enter.
+- **Lupa:** clic derecho › *Lupa* (o **Alt+L**). La página se amplía alrededor del cursor; la rueda del mouse amplía o reduce (de 1× a 8×) y al mover el mouse recorres la página. Los clics siguen funcionando. **Esc** o clic derecho para salir. Para ver nítido algo que vas a leer largo rato, Ctrl + rueda (zoom propio de Chrome) se ve más definido.
 - **Recortar una zona:** arrastras un recuadro y obtienes la imagen y el texto de esa parte de la página.
 
 ## Instalar en un perfil de Chrome (una vez por perfil)

@@ -189,6 +189,30 @@ await clicEnSombra('Guardar texto en la hoja');
 await pagina.waitForTimeout(300);
 ok(recibidos.at(-1)?.tipo === 'recorte', 'el texto del recorte llega a la hoja');
 
+// 11b. Lupa: se abre desde el clic derecho, la rueda amplía y reduce, Esc sale
+await pagina.mouse.click(5, 5);
+await pagina.mouse.click(300, 60, { button: 'right' });
+await pagina.waitForTimeout(100);
+await clicEnSombra('Lupa');
+const escala = () => pagina.evaluate(() => { const m = document.documentElement.style.transform.match(/scale\(([\d.]+)\)/); return m ? +m[1] : 1; });
+ok((await escala()) === 2, 'la lupa arranca en 2×');
+const scrollAntes = await pagina.evaluate(() => scrollY);
+await pagina.mouse.move(300, 60);
+await pagina.mouse.wheel(0, -100);
+await pagina.waitForTimeout(150);
+ok((await escala()) > 2, 'rueda hacia arriba amplía');
+ok((await pagina.evaluate(() => scrollY)) === scrollAntes, 'con la lupa la rueda no desplaza la página');
+await pagina.mouse.wheel(0, 100); await pagina.mouse.wheel(0, 100);
+await pagina.waitForTimeout(150);
+ok((await escala()) < 2, 'rueda hacia abajo reduce');
+await pagina.keyboard.press('Escape');
+ok((await escala()) === 1 && !(await pagina.evaluate(() => document.documentElement.style.transform)), 'Esc quita la lupa y deja la página como estaba');
+await pagina.keyboard.press('Alt+l');
+ok((await escala()) === 2, 'Alt+L abre la lupa');
+await pagina.mouse.click(300, 60, { button: 'right' });
+ok((await escala()) === 1, 'clic derecho cierra la lupa');
+ok(!(await enSombra('.menu')).length, 'ese clic derecho no abre el menú');
+
 // 12. Repetido
 p = await centroDe('#p1', '317 723 5440');
 await pagina.mouse.click(5, 5);

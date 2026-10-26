@@ -112,6 +112,10 @@ await hermes.evaluate(() => window.dispatchEvent(new Event('focus')));
 ok((await textos(hermes, '.puente'))[0]?.startsWith('Pasar a ChatGPT'), 'Hermes muestra el botón "Pasar a ChatGPT"');
 ok((await textos(chatgpt, '.puente'))[0]?.startsWith('Pasar a Hermes'), 'ChatGPT muestra el botón "Pasar a Hermes"');
 
+const lado = await hermes.evaluate(() => { const r = window.__sombra.querySelector('.puente').getBoundingClientRect(); return { derecha: innerWidth - r.right, fuente: getComputedStyle(window.__sombra.querySelector('.puente')).fontFamily }; });
+ok(lado.derecha < 40, 'en Hermes el botón está a la derecha');
+ok(!/^(serif|"?Times)/i.test(lado.fuente), 'el botón usa letra sin serifa');
+
 // 1. Hermes → ChatGPT: última respuesta con texto, por la API de la sesión del enlace
 await clicBoton(hermes);
 await hermes.waitForTimeout(800);

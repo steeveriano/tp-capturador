@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TP Capturador
 // @namespace    https://github.com/steeveriano/tp-capturador
-// @version      2.1.0
+// @version      2.2.0
 // @description  Contactos a Google Sheets, menú propio de clic derecho, historial del portapapeles, recorte de zonas y puente Hermes ⇄ ChatGPT.
 // @author       Steeve Riaño · tierraparaiso
 // @homepageURL  https://github.com/steeveriano/tp-capturador
@@ -36,7 +36,7 @@
   'use strict';
   if (window.top !== window.self) return;
 
-  const VERSION = '2.1.0';
+  const VERSION = '2.2.0';
   const REPO = 'https://github.com/steeveriano/tp-capturador';
   const HOST = location.hostname;
 
@@ -121,7 +121,8 @@
       box-shadow: 0 6px 18px rgba(0,0,0,.35); }
     .puente:hover { background: #d97706; }
     .puente .k { font-weight: 400; opacity: .75; font-size: 11px; }
-    .puente.hermes { left: 70px; }
+    .puente { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    .puente.hermes { right: 24px; }
     .puente.chatgpt { right: 22px; bottom: 120px; }
   `;
 
@@ -596,6 +597,7 @@
     }
     items.push(seccion('Página'));
     items.push(boton('Recortar una zona…', iniciarRecorte));
+    items.push(boton('Lupa (rueda para ampliar)', () => iniciarLupa(x, y), 'Alt+L'));
     if (!destino.editable) items.push(boton('Historial del portapapeles', () => abrirHistorial(null), 'Alt+V'));
     items.push(boton('Copiar título y dirección', () => copiar(document.title + '\n' + location.href)));
     items.push(boton('Guardar esta página en la hoja', () => guardar({ tipo: 'pagina', valor: location.origin + location.pathname, nota: document.title })));
@@ -694,6 +696,57 @@
     s.appendChild(panel);
     pintar();
     buscar.focus();
+  }
+
+
+  // ───────────────────────── Lupa ─────────────────────────
+  // Amplía la página alrededor del cursor. Rueda: ampliar o reducir. Mover el mouse: recorrer.
+  // Esc, clic derecho o reducir hasta 1× para salir. Los clics siguen funcionando con la lupa puesta.
+  let lupa = null;
+  function iniciarLupa(x, y) {
+    if (lupa) return;
+    cerrar();
+    const html = document.documentElement;
+    lupa = {
+      z: 2, x: x === undefined ? innerWidth / 2 : x, y: y === undefined ? innerHeight / 2 : y,
+      previo: { transform: html.style.transform, origin: html.style.transformOrigin, overflow: html.style.overflow, transition: html.style.transition },
+    };
+    html.style.overflow = 'hidden';
+    html.style.transition = 'transform 80ms ease-out';
+    aplicarLupa();
+    window.addEventListener('wheel', ruedaLupa, { capture: true, passive: false });
+    window.addEventListener('mousemove', moverLupa, { capture: true, passive: true });
+    window.addEventListener('keydown', teclaLupa, true);
+    window.addEventListener('contextmenu', salirLupaClicDerecho, true);
+    toast('Lupa 2×. Rueda: ampliar o reducir. Esc o clic derecho: salir.', 'ok');
+  }
+  function aplicarLupa() {
+    const html = document.documentElement;
+    html.style.transformOrigin = `${lupa.x + scrollX}px ${lupa.y + scrollY}px`;
+    html.style.transform = `scale(${lupa.z})`;
+  }
+  function ruedaLupa(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    lupa.z = Math.min(8, lupa.z * (e.deltaY < 0 ? 1.15 : 1 / 1.15));
+    if (lupa.z <= 1.02) { salirLupa(); return; }
+    aplicarLupa();
+  }
+  function moverLupa(e) { lupa.x = e.clientX; lupa.y = e.clientY; aplicarLupa(); }
+  function teclaLupa(e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); salirLupa(); } }
+  function salirLupaClicDerecho(e) { e.preventDefault(); e.stopImmediatePropagation(); salirLupa(); }
+  function salirLupa() {
+    if (!lupa) return;
+    const html = document.documentElement;
+    html.style.transform = lupa.previo.transform;
+    html.style.transformOrigin = lupa.previo.origin;
+    html.style.overflow = lupa.previo.overflow;
+    html.style.transition = lupa.previo.transition;
+    window.removeEventListener('wheel', ruedaLupa, { capture: true });
+    window.removeEventListener('mousemove', moverLupa, { capture: true });
+    window.removeEventListener('keydown', teclaLupa, true);
+    window.removeEventListener('contextmenu', salirLupaClicDerecho, true);
+    lupa = null;
   }
 
   // ───────────────────────── Recorte de zona ─────────────────────────
@@ -1052,6 +1105,7 @@
     if (sitioDesactivado()) { GM_registerMenuCommand('Activar en este sitio (' + HOST + ')', alternarSitio); return; }
     GM_registerMenuCommand('Historial del portapapeles (Alt+V)', () => abrirHistorial(capturarDestino(document.activeElement)));
     GM_registerMenuCommand('Recortar una zona', iniciarRecorte);
+    GM_registerMenuCommand('Lupa (Alt+L)', () => iniciarLupa());
     const c = cfg();
     if (c.hoja) GM_registerMenuCommand('Abrir la hoja de capturas', () => GM_openInTab(c.hoja, { active: true }));
     GM_registerMenuCommand(`Enviar pendientes (${GM_getValue('cola', []).length})`, () => vaciarCola(true));
@@ -1107,6 +1161,11 @@
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && abierto) { cerrar(); return; }
+    if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyL') {
+      e.preventDefault(); e.stopPropagation();
+      if (lupa) salirLupa(); else iniciarLupa(ultimoPunto.x, ultimoPunto.y);
+      return;
+    }
     if (LADO && e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyP') {
       e.preventDefault(); e.stopPropagation();
       pasarAlOtro();
@@ -1125,7 +1184,9 @@
 
   // Pista al pasar el mouse sobre un contacto
   let tip = null, ultimoMov = 0;
+  const ultimoPunto = { x: undefined, y: undefined };
   document.addEventListener('mousemove', (e) => {
+    ultimoPunto.x = e.clientX; ultimoPunto.y = e.clientY;
     const ahora = Date.now();
     if (ahora - ultimoMov < 120 || !soportaResaltado || !coincidencias) return;
     ultimoMov = ahora;
