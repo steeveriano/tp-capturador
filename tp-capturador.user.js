@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         TP Capturador
 // @namespace    https://github.com/steeveriano/tp-capturador
-// @version      2.3.1
-// @description  Contactos a Google Sheets, menú propio de clic derecho, historial del portapapeles, recorte de zonas y puente Hermes ⇄ ChatGPT.
+// @version      2.4.0
+// @description  Contactos a Google Sheets, menú propio de clic derecho, historial del portapapeles, recorte de zonas, puente Hermes ⇄ ChatGPT y captura de secretos a la Bóveda local.
 // @author       Steeve Riaño · tierraparaiso
-// @homepageURL  https://github.com/steeveriano/tp-capturador
-// @supportURL   https://github.com/steeveriano/tp-capturador/issues
-// @updateURL    https://raw.githubusercontent.com/steeveriano/tp-capturador/main/tp-capturador.user.js
-// @downloadURL  https://raw.githubusercontent.com/steeveriano/tp-capturador/main/tp-capturador.user.js
+// @homepageURL  https://github.com/sbntpnet/tp-capturador
+// @supportURL   https://github.com/sbntpnet/tp-capturador/issues
+// @updateURL    https://raw.githubusercontent.com/sbntpnet/tp-capturador/v2.4.0/tp-capturador.user.js
+// @downloadURL  https://raw.githubusercontent.com/sbntpnet/tp-capturador/v2.4.0/tp-capturador.user.js
 // @match        *://*/*
 // @noframes
 // @run-at       document-idle
@@ -24,11 +24,14 @@
 // @connect      script.google.com
 // @connect      script.googleusercontent.com
 // @connect      tierraparaiso.net
+// @connect      127.0.0.1
 // ==/UserScript==
 
 /*
  * TP Capturador · código fuente único.
  * Reglas para quien lo modifique (personas o Claude Code): ver AGENTS.md del repositorio.
+ * Versión fija: @updateURL apunta a la etiqueta de esta versión, así que Tampermonkey no se
+ * actualiza solo desde la rama principal. Cada versión nueva se instala a mano desde su etiqueta.
  * Ningún secreto vive aquí: la dirección de la hoja y la clave llegan por el enlace de activación
  * y quedan guardadas solo en el almacenamiento de Tampermonkey de cada perfil de Chrome.
  */
@@ -36,8 +39,8 @@
   'use strict';
   if (window.top !== window.self) return;
 
-  const VERSION = '2.3.1';
-  const REPO = 'https://github.com/steeveriano/tp-capturador';
+  const VERSION = '2.4.0';
+  const REPO = 'https://github.com/sbntpnet/tp-capturador';
   const HOST = location.hostname;
 
   // ───────────────────────── Configuración y almacenamiento ─────────────────────────
@@ -51,11 +54,15 @@
     resaltar: true,        // subrayar teléfonos y correos
     barraSeleccion: true,  // barra flotante al seleccionar texto
     menuDerecho: true,     // menú propio en clic derecho
-    omitirSecretos: false, // si se enciende, no guarda en el historial lo que parezca contraseña o token
+    omitirSecretos: true,  // nada que parezca secreto va al historial, a la hoja ni al puente
+    ayudantePuerto: 47321, // ayudante local de la Bóveda (solo 127.0.0.1)
+    limpiarPortapapelesSeg: 30,
     puenteEncabezado: true, // al pasar entre Hermes y ChatGPT, anteponer "[Respuesta de …]"
   };
   const cfg = () => Object.assign({}, CFG_BASE, GM_getValue('cfg', {}));
   const setCfg = (cambios) => GM_setValue('cfg', Object.assign(cfg(), cambios));
+  // 2.4.0: «Omitir secretos» vuelve a quedar encendido aunque una versión anterior lo hubiera apagado.
+  (() => { const c = GM_getValue('cfg', {}); if ((c.cfgVersion || 1) < 2) GM_setValue('cfg', Object.assign(c, { omitirSecretos: true, cfgVersion: 2 })); })();
   const desactivados = () => GM_getValue('desactivados', []);
   const sitioDesactivado = () => desactivados().includes(HOST);
 
@@ -116,6 +123,15 @@
     .resultado textarea { all: unset; white-space: pre-wrap; background: #1f2937; border-radius: 6px; padding: 8px 10px; min-height: 80px; max-height: 200px; overflow: auto; font-size: 12px; }
     .resultado .acciones { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; border-top: 1px solid #374151; }
     .resultado .acciones button { background: #1f2937; }
+    .boveda { width: min(460px, 92vw); }
+    .boveda .campo { display: grid; grid-template-columns: 90px 1fr; align-items: center; gap: 8px; }
+    .boveda .campo span { color: #9ca3af; font-size: 12px; }
+    .boveda input, .boveda select { all: unset; background: #1f2937; border-radius: 6px; padding: 7px 9px; color: #f9fafb; font-size: 13px; }
+    .boveda select option { background: #1f2937; }
+    .boveda .vista { font-family: ui-monospace, Consolas, monospace; color: #fcd34d; font-size: 12px; }
+    .boveda .oculto { color: #9ca3af; font-size: 12px; }
+    .boveda .aviso { color: #fca5a5; font-size: 12px; min-height: 1em; }
+    .boveda .pie { color: #6b7280; font-size: 11px; }
     .puente { all: unset; position: fixed; bottom: 18px; cursor: pointer; display: flex; gap: 10px; align-items: center;
       padding: 9px 14px; border-radius: 999px; background: #b45309; color: #fff; font-size: 13px; font-weight: 600;
       box-shadow: 0 6px 18px rgba(0,0,0,.35); }
@@ -140,7 +156,7 @@
       // Evita que un clic en la interfaz robe el foco del campo donde se va a pegar.
       sombra.addEventListener('mousedown', (e) => {
         const t = e.composedPath()[0];
-        if (!(t instanceof HTMLInputElement) && !(t instanceof HTMLTextAreaElement)) e.preventDefault();
+        if (!(t instanceof HTMLInputElement) && !(t instanceof HTMLTextAreaElement) && !(t instanceof HTMLSelectElement) && !(t instanceof HTMLOptionElement)) e.preventDefault();
       });
     }
     (document.body || document.documentElement).appendChild(raiz);
@@ -197,7 +213,7 @@
     if (!texto || !texto.trim()) return;
     const c = cfg();
     if (elemento && elemento.matches && elemento.matches('input[type=password], [autocomplete="one-time-code"], [autocomplete="current-password"], [autocomplete="new-password"]')) return;
-    if (c.omitirSecretos && pareceSecreto(texto)) return;
+    if (c.omitirSecretos && contieneSecreto(texto)) return;
     const recortado = texto.length > 20000 ? texto.slice(0, 20000) : texto;
     const lista = historial().filter((x) => x.texto !== recortado);
     lista.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), t: Date.now(), texto: recortado, sitio: HOST, titulo: document.title.slice(0, 120), origen });
@@ -219,7 +235,7 @@
     if (el.tagName === 'TEXTAREA') return !el.readOnly && !el.disabled;
     if (el.tagName === 'INPUT') {
       const tipo = (el.type || 'text').toLowerCase();
-      return ['text', 'search', 'email', 'tel', 'url', 'number'].includes(tipo) && !el.readOnly && !el.disabled;
+      return ['text', 'search', 'email', 'tel', 'url', 'number', 'password'].includes(tipo) && !el.readOnly && !el.disabled;
     }
     return false;
   }
@@ -256,7 +272,7 @@
     return d;
   }
 
-  function pegarEn(destino, texto) {
+  function pegarEn(destino, texto, alHistorial = true) {
     const el = destino && destino.editable;
     if (!el || !el.isConnected) { copiar(texto, 'historial'); toast('Copiado. No había un campo abierto donde pegar.', 'aviso'); return; }
     el.focus();
@@ -282,7 +298,7 @@
         ok = true;
       }
     }
-    if (ok) registrar(texto, 'pegar');
+    if (ok && alHistorial) registrar(texto, 'pegar');
   }
 
   function cortarEn(destino) {
@@ -480,6 +496,7 @@
 
   async function guardar(registro) {
     const c = cfg();
+    if (c.omitirSecretos && (contieneSecreto(registro.valor) || contieneSecreto(registro.nota))) { toast('Eso parece un secreto: no va a la hoja. Usa «A la Bóveda».', 'error'); return; }
     if (!c.endpoint || !c.token) { toast('Este perfil no está activado. Abre el enlace de activación (bóveda: tp_capturador_enlace_activacion).', 'error'); return; }
     const datos = Object.assign({
       token: c.token, perfil: c.perfil, version: VERSION, sitio: HOST,
@@ -512,6 +529,222 @@
     }
     GM_setValue('cola', quedan);
     if (enviados || forzar) toast(`Pendientes enviados: ${enviados}. Siguen en cola: ${quedan.length}.`, quedan.length ? 'aviso' : 'ok');
+  }
+
+  // ───────────────────────── Bóveda (ayudante local en 127.0.0.1) ─────────────────────────
+  // El plugin no escribe en el disco: habla con el ayudante local, que guarda con la Bóveda del
+  // equipo. El valor solo vive en memoria mientras se envía: nunca va al historial, a la hoja,
+  // al puente ni al almacenamiento de Tampermonkey.
+  function ayudante(metodo, ruta, cuerpo, extra) {
+    const puerto = cfg().ayudantePuerto;
+    const cab = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
+    const clave = GM_getValue('boveda:clave', '');
+    if (clave && !cab['X-TP-Vincular']) cab['X-TP-Clave'] = clave;
+    return new Promise((res, rej) => GM_xmlhttpRequest({
+      method: metodo, url: `http://127.0.0.1:${puerto}${ruta}`, headers: cab, timeout: 15000,
+      data: cuerpo ? JSON.stringify(cuerpo) : undefined,
+      onload: (r) => {
+        let j = {};
+        try { j = JSON.parse(r.responseText || '{}'); } catch (_) { /* respuesta vacía */ }
+        res({ estado: r.status, j });
+      },
+      onerror: () => rej(new Error('El ayudante de la Bóveda no está corriendo en este equipo.')),
+      ontimeout: () => rej(new Error('El ayudante de la Bóveda no respondió.')),
+    }));
+  }
+
+  function explicarFallo(r) {
+    if (r.estado === 401) return 'El ayudante no reconoce este navegador: vincúlalo de nuevo (menú de Tampermonkey).';
+    if (r.estado === 429) return 'El ayudante se bloqueó un minuto por claves equivocadas.';
+    if (r.estado === 409) return 'Ya existe un secreto con ese nombre. No se sobrescribe: usa otro nombre.';
+    return (r.j && r.j.error) ? 'El ayudante respondió: ' + r.j.error : 'El ayudante respondió ' + r.estado + '.';
+  }
+
+  async function vincularAyudante() {
+    try {
+      const r = await ayudante('GET', '/vincular', null, { 'X-TP-Vincular': '1' });
+      if (r.estado === 200 && r.j.clave) { GM_setValue('boveda:clave', r.j.clave); toast('Navegador vinculado con el ayudante de la Bóveda.', 'ok'); }
+      else toast('La vinculación está cerrada. Arranca el ayudante con «servir --vincular» y repite en menos de 2 minutos.', 'error');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  async function estadoAyudante() {
+    try {
+      const r = await ayudante('GET', '/salud');
+      const vinculado = !!GM_getValue('boveda:clave', '');
+      toast(`Ayudante ${r.j.version || '?'} · destino: ${r.j.destino || '?'} · ${vinculado ? 'vinculado' : 'sin vincular'}.`, vinculado ? 'ok' : 'aviso');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  const PARTE = (t) => String(t || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const nombreNormalizado = (s, e, t) => [PARTE(s), PARTE(e), PARTE(t)].every(Boolean) ? [PARTE(s), PARTE(e), PARTE(t)].join('_') : '';
+
+  // Toma el valor de lo seleccionado o, en un campo de contraseña sin selección, del campo entero.
+  function valorParaBoveda(objetivo) {
+    const campo = objetivo && objetivo.closest ? objetivo.closest('input[type=password]') : null;
+    const sel = seleccionActual().texto;
+    if (sel && sel.trim()) return sel.trim();
+    if (campo && campo.value) return campo.value;
+    return '';
+  }
+
+  function aLaBoveda(valorInicial) {
+    cerrar();
+    let valor = valorInicial;
+    if (!valor) { toast('Selecciona el secreto (o haz clic derecho sobre el campo de contraseña) y vuelve a intentarlo.', 'aviso'); return; }
+    if (!GM_getValue('boveda:clave', '')) { toast('Primero vincula este navegador con el ayudante (menú de Tampermonkey).', 'error'); return; }
+    const s = ui();
+    const campo = (etq, nodo) => h('label', { class: 'campo' }, h('span', null, etq), nodo);
+    const servicio = h('input', { type: 'text', placeholder: 'p. ej. openai, cloudflare r2, tailscale' });
+    const entorno = h('select', null, ...['prod', 'staging', 'dev', 'local', 'pruebas'].map((v) => h('option', { value: v }, v)));
+    const tipo = h('select', null, ...['api_key', 'token', 'password', 'secreto_cliente', 'clave_privada', 'webhook', 'otro'].map((v) => h('option', { value: v }, v)));
+    const objeto = h('input', { type: 'text', placeholder: 'Para qué sirve' });
+    const titular = h('input', { type: 'text', placeholder: 'Persona o aplicación dueña' });
+    const vista = h('div', { class: 'vista' });
+    const aviso = h('div', { class: 'aviso' });
+    const pintar = () => { const n = nombreNormalizado(servicio.value, entorno.value, tipo.value); vista.textContent = n ? `Se guardará como ${n}` : 'Escribe el servicio'; };
+    [servicio, entorno, tipo].forEach((el) => el.addEventListener('input', pintar));
+    pintar();
+    const quitar = () => { valor = ''; nodo.remove(); };
+    const enviarBoveda = async () => {
+      const n = nombreNormalizado(servicio.value, entorno.value, tipo.value);
+      if (!n || !objeto.value.trim() || !titular.value.trim()) { aviso.textContent = 'Faltan el servicio, el objeto o el titular.'; return; }
+      aviso.textContent = 'Guardando…';
+      try {
+        const r = await ayudante('POST', '/guardar', {
+          servicio: servicio.value, entorno: entorno.value, tipo: tipo.value, valor,
+          objeto: objeto.value.trim(), titular: titular.value.trim(), origen: location.origin + location.pathname,
+        });
+        if (r.estado === 200) {
+          quitar();
+          toast(`Guardado en la Bóveda como ${r.j.nombre}. La ficha (sin valor) quedó en la cola del Custodio.`, 'ok');
+        } else aviso.textContent = explicarFallo(r);
+      } catch (e) { aviso.textContent = e.message; }
+    };
+    const nodo = h('div', { class: 'resultado boveda' },
+      h('header', null, h('span', null, 'A la Bóveda'), h('button', { on: { click: quitar } }, 'Cancelar')),
+      h('div', { class: 'cuerpo' },
+        h('div', { class: 'oculto' }, `Valor capturado: ${'•'.repeat(Math.min(valor.length, 12))} (${valor.length} caracteres). No se muestra ni se guarda en el navegador.`),
+        campo('Servicio', servicio), campo('Entorno', entorno), campo('Tipo', tipo),
+        vista, campo('Objeto', objeto), campo('Titular', titular),
+        h('div', { class: 'pie' }, 'Rotación: cada 90 días (Decreto 9, Art. 5). No se sobrescribe un secreto existente.'),
+        aviso),
+      h('div', { class: 'acciones' }, h('button', { on: { click: enviarBoveda } }, 'Guardar en la Bóveda')));
+    nodo.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Escape') quitar(); if (e.key === 'Enter') enviarBoveda(); });
+    s.appendChild(nodo);
+    servicio.focus();
+  }
+
+  let panelBoveda = null;
+  async function pegarDesdeBoveda(destino) {
+    cerrar();
+    if (!GM_getValue('boveda:clave', '')) { toast('Primero vincula este navegador con el ayudante (menú de Tampermonkey).', 'error'); return; }
+    let nombres = [];
+    try {
+      const r = await ayudante('GET', '/nombres');
+      if (r.estado !== 200) { toast(explicarFallo(r), 'error'); return; }
+      nombres = r.j.nombres || [];
+    } catch (e) { toast(e.message, 'error'); return; }
+    if (panelBoveda) panelBoveda.remove();
+    const lista = h('div', { class: 'lista' });
+    const buscar = h('input', { placeholder: 'Buscar por nombre…', type: 'text' });
+    let marcado = 0;
+    const panel = h('div', { class: 'panel' },
+      h('header', null, h('span', null, 'Pegar desde la Bóveda'), h('button', { on: { click: () => panel.remove() } }, 'Cerrar')),
+      buscar, lista,
+      h('footer', null, h('span', null, destino && destino.editable ? 'Se pega en el campo donde estabas' : `Sin campo: se copia y el portapapeles se limpia a los ${cfg().limpiarPortapapelesSeg} s`)));
+    const filtrados = () => nombres.filter((n) => n.includes(buscar.value.trim().toLowerCase()));
+    const usar = async (n) => {
+      panel.remove();
+      try {
+        const r = await ayudante('POST', '/obtener', { nombre: n, origen: location.origin + location.pathname });
+        if (r.estado !== 200) { toast(explicarFallo(r), 'error'); return; }
+        let v = r.j.valor;
+        if (destino && destino.editable && destino.editable.isConnected) {
+          pegarEn(destino, v, false);
+          toast(`Pegado «${n}». No pasó por el portapapeles ni por el historial.`, 'ok');
+        } else {
+          GM_setClipboard(v, 'text');
+          const seg = cfg().limpiarPortapapelesSeg;
+          setTimeout(() => GM_setClipboard('', 'text'), seg * 1000);
+          toast(`«${n}» copiado. El portapapeles se limpia en ${seg} s.`, 'aviso');
+        }
+        v = '';
+      } catch (e) { toast(e.message, 'error'); }
+    };
+    const pintar = () => {
+      const items = filtrados();
+      lista.replaceChildren();
+      if (!items.length) { lista.append(h('div', { class: 'vacio' }, 'Ningún nombre coincide.')); return; }
+      marcado = Math.min(marcado, items.length - 1);
+      items.forEach((n, i) => {
+        const fila = h('div', { class: 'item' + (i === marcado ? ' sel' : '') }, h('div', { class: 't' }, n));
+        fila.addEventListener('click', () => usar(n));
+        lista.append(fila);
+      });
+    };
+    buscar.addEventListener('input', () => { marcado = 0; pintar(); });
+    buscar.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      const items = filtrados();
+      if (e.key === 'Escape') panel.remove();
+      else if (e.key === 'ArrowDown') { marcado = Math.min(marcado + 1, items.length - 1); pintar(); e.preventDefault(); }
+      else if (e.key === 'ArrowUp') { marcado = Math.max(marcado - 1, 0); pintar(); e.preventDefault(); }
+      else if (e.key === 'Enter' && items[marcado]) usar(items[marcado]);
+    });
+    panelBoveda = panel;
+    ui().appendChild(panel);
+    pintar();
+    buscar.focus();
+  }
+
+  async function migrarAOpenBao() {
+    try {
+      const p = await ayudante('POST', '/migrar/plan', {});
+      if (p.estado !== 200) { toast(explicarFallo(p), 'error'); return; }
+      if (!confirm(`Migrar la Bóveda provisional a OpenBao.\n\nSecretos: ${p.j.total}\nPor migrar: ${p.j.por_migrar}\nYa están en OpenBao (no se tocan): ${p.j.ya_estaban}\n\nNo se borra nada de la Bóveda provisional. ¿Continuar?`)) return;
+      const r = await ayudante('POST', '/migrar/ejecutar', { confirmar: true });
+      if (r.estado !== 200) { toast(explicarFallo(r), 'error'); return; }
+      toast(`Migrados: ${r.j.migrados} · ya estaban: ${r.j.ya_estaban} · fallidos: ${r.j.fallidos.length}.`, r.j.fallidos.length ? 'aviso' : 'ok');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  // ───────────────────────── Detección de secretos ─────────────────────────
+  // Nada que parezca secreto va al historial, a la hoja ni al puente.
+  const PATRONES_SECRETO = [
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g,
+    /\b(?:sk-(?:proj-|ant-)?[A-Za-z0-9_-]{16,}|sk_(?:live|test)_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|pit-[a-f0-9-]{20,}|tskey-[A-Za-z0-9-]{10,}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,})/g,
+    /\b(?:password|passwd|pwd|contrase(?:ñ|n)a|clave|secret|token|api[_-]?key)\s*[:=]\s*["']?[^\s"']{6,}/gi,
+  ];
+
+  function buscarSecretos(texto) {
+    const t = String(texto || '');
+    const hallados = [];
+    for (const re of PATRONES_SECRETO) {
+      re.lastIndex = 0;
+      let m;
+      while ((m = re.exec(t))) hallados.push([m.index, m.index + m[0].length]);
+    }
+    // Palabras largas de alta variedad fuera de una URL: típicas de claves y tokens.
+    const palabra = /\S{20,200}/g;
+    let m;
+    while ((m = palabra.exec(t))) {
+      const w = m[0].replace(/^[("'[<]+|[)"'\].,;:>]+$/g, '');
+      if (/:\/\//.test(w) || /^[\w.+-]+@[\w-]+\./.test(w)) continue;
+      const clases = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((r) => r.test(w)).length;
+      if (clases >= 3 && /\d/.test(w)) hallados.push([m.index, m.index + m[0].length]);
+    }
+    return hallados.sort((a, b) => a[0] - b[0]);
+  }
+
+  const contieneSecreto = (texto) => !!texto && (pareceSecreto(texto) || buscarSecretos(texto).length > 0);
+
+  function taparSecretos(texto) {
+    const r = buscarSecretos(texto);
+    if (!r.length) return { texto, tapados: 0 };
+    let out = '', i = 0, n = 0;
+    for (const [a, b] of r) { if (a < i) continue; out += texto.slice(i, a) + '[secreto omitido]'; i = b; n++; }
+    return { texto: out + texto.slice(i), tapados: n };
   }
 
   // ───────────────────────── Menús flotantes ─────────────────────────
@@ -556,6 +789,7 @@
     const enlace = e.target.closest ? e.target.closest('a[href]') : null;
     const imagen = e.target.closest ? e.target.closest('img') : null;
     const contacto = contactoEnPunto(x, y) || contactoDeEnlace(enlace);
+    const valorBoveda = valorParaBoveda(e.target);
     const items = [];
 
     if (contacto) items.push(seccion(contacto.tipo === 'telefono' ? 'Teléfono' : 'Correo'), h('div', { class: 'valor' }, contacto.valor), ...accionesContacto(contacto), sep());
@@ -569,12 +803,19 @@
       items.push(sep());
     }
 
+    if (valorBoveda) {
+      items.push(seccion('Bóveda'));
+      items.push(boton(sel.trim() ? 'A la Bóveda… (lo seleccionado)' : 'A la Bóveda… (este campo)', () => aLaBoveda(valorBoveda)));
+      items.push(sep());
+    }
+
     if (destino.editable) {
       const ultimo = historial()[0];
       items.push(seccion('Pegar'));
       if (ultimo) items.push(boton('Pegar lo último copiado', () => pegarEn(destino, ultimo.texto), 'historial'));
       items.push(boton('Pegar del portapapeles de Windows', async () => { const t = await leerPortapapelesSistema(); if (t) pegarEn(destino, t); }, 'Ctrl+V'));
       items.push(boton('Pegar desde el historial…', () => abrirHistorial(destino), 'Alt+V'));
+      items.push(boton('Pegar desde la Bóveda…', () => pegarDesdeBoveda(destino)));
       items.push(sep());
     }
 
@@ -632,6 +873,7 @@
       contacto && contacto.tipo === 'telefono' ? boton('WhatsApp', () => GM_openInTab('https://wa.me/' + contacto.valor.replace(/\D/g, ''), { active: true })) : null,
       boton('Buscar', () => GM_openInTab('https://www.google.com/search?q=' + encodeURIComponent(t.slice(0, 300)), { active: true })),
       boton('Recortar', iniciarRecorte),
+      boton('A la Bóveda', () => aLaBoveda(t)),
     ].filter(Boolean);
     const nodo = h('div', { class: 'barra' }, botones);
     abrir(nodo, rect.left, rect.top - 44 < 6 ? rect.bottom + 8 : rect.top - 44, 'barra');
@@ -1004,6 +1246,12 @@
       que = 'la última respuesta';
     }
     if (!texto) throw new Error('No encontré qué pasar.');
+    let tapados = 0;
+    if (cfg().omitirSecretos) {
+      if (pareceSecreto(texto)) throw new Error('Eso parece un secreto: no pasa por el puente. Usa «A la Bóveda».');
+      ({ texto, tapados } = taparSecretos(texto));
+      if (tapados) que += ` (tapé ${tapados} posible${tapados > 1 ? 's' : ''} secreto${tapados > 1 ? 's' : ''})`;
+    }
     const cuerpo = cfg().puenteEncabezado ? `[Respuesta de ${LADOS[LADO].nombre}]\n\n${texto}` : texto;
     return { cuerpo, que };
   }
@@ -1110,7 +1358,8 @@
 
   // ───────────────────────── Activación y comandos ─────────────────────────
   function revisarActivacion() {
-    if (HOST !== 'github.com' || !location.pathname.toLowerCase().startsWith('/steeveriano/tp-capturador')) return;
+    const ruta = location.pathname.toLowerCase();
+    if (HOST !== 'github.com' || !(ruta.startsWith('/sbntpnet/tp-capturador') || ruta.startsWith('/steeveriano/tp-capturador'))) return;
     const p = new URLSearchParams(location.hash.slice(1));
     if (!p.has('tp-activar')) return;
     const endpoint = p.get('e') || '', token = p.get('k') || '', hoja = p.get('h') || '';
@@ -1147,6 +1396,10 @@
     if (sitioDesactivado()) { GM_registerMenuCommand('Activar en este sitio (' + HOST + ')', alternarSitio); return; }
     GM_registerMenuCommand('Historial del portapapeles (Alt+V)', () => abrirHistorial(capturarDestino(document.activeElement)));
     GM_registerMenuCommand('Recortar una zona', iniciarRecorte);
+    GM_registerMenuCommand('Pegar desde la Bóveda', () => pegarDesdeBoveda(capturarDestino(document.activeElement)));
+    GM_registerMenuCommand('Vincular con el ayudante de la Bóveda', vincularAyudante);
+    GM_registerMenuCommand('Estado del ayudante de la Bóveda', estadoAyudante);
+    GM_registerMenuCommand('Migrar la Bóveda a OpenBao', migrarAOpenBao);
     GM_registerMenuCommand('Lupa (Alt+L)', () => iniciarLupa());
     const c = cfg();
     if (c.hoja) GM_registerMenuCommand('Abrir la hoja de capturas', () => GM_openInTab(c.hoja, { active: true }));

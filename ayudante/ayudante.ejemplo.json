@@ -1,0 +1,13 @@
+{
+  "ruta_secreto": "D:\\RUTA\\A\\_herramientas",
+  "puerto": 47321,
+  "destino": "local",
+  "nombre_clave": "tp_capturador_ayudante_clave",
+  "openbao": {
+    "direccion": "",
+    "montaje": "secret",
+    "prefijo": "tp",
+    "token_nombre": "openbao_token_tp_capturador",
+    "ca": ""
+  }
+}

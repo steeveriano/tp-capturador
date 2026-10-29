@@ -189,6 +189,16 @@ await hermes2.keyboard.press('Alt+p');
 await hermes2.waitForTimeout(800);
 ok(((await promptChatGPT(chatgpt2)).match(/Respuesta final de Hermes/g) || []).length === 2, 'Alt+P envía directo a la conversación emparejada');
 
+// 7b. Nada que parezca secreto pasa por el puente: se tapa
+const tokenFalso = ['s', 'k-'].join('') + 'a1B2c3D4e5F6g7H8i9J0k1L2';
+await chatgpt2.evaluate((t) => { const m = [...document.querySelectorAll('[data-message-author-role="assistant"] .markdown')].at(-1); m.innerText = 'Usa esta clave: ' + t + ' y reinicia.'; }, tokenFalso);
+await chatgpt2.evaluate(() => window.dispatchEvent(new Event('focus')));
+await pasar(chatgpt2, 'Hermes · Chat');
+await chatgpt2.waitForTimeout(800);
+const conTapado = await hermes2.evaluate(() => window.__pegado.at(-1) || '');
+ok(conTapado.includes('[secreto omitido]') && !conTapado.includes(tokenFalso), 'una clave dentro de la respuesta se tapa antes de pasar');
+ok((await textos(chatgpt2, '.toast')).some((t) => t.includes('tapé 1 posible secreto')), 'avisa cuántos secretos tapó');
+
 // 8. Otros sitios no muestran el botón
 const otro = await ctx.newPage(); paginas.add(otro);
 await ctx.route('https://prueba.local/**', (r) => r.fulfill({ contentType: 'text/html', body: '<html><body>nada</body></html>' }));

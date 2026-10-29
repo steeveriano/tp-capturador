@@ -5,9 +5,10 @@ Herramienta personal para Chrome, sobre Tampermonkey. Funciona en todos los siti
 - **Contactos:** subraya teléfonos y correos de cualquier página. Un clic los guarda en la hoja de Google, abre WhatsApp, llama o busca.
 - **Clic derecho propio:** copiar, cortar, pegar lo último, pegar del historial, recortar, guardar en la hoja. Un segundo clic derecho (o Ctrl+clic derecho) abre el menú normal de Chrome. Los sitios con menú propio, como Google Docs o Maps, conservan el suyo.
 - **Barra al seleccionar texto:** Copiar · Cortar · Guardar · WhatsApp · Buscar · Recortar.
-- **Historial del portapapeles:** guarda todo lo que copias durante 24 horas, solo en ese perfil de Chrome. Se abre con **Alt+V**.
+- **Historial del portapapeles:** guarda lo que copias durante 24 horas, solo en ese perfil de Chrome, salvo lo que parezca un secreto. Se abre con **Alt+V**.
 - **Puente Hermes ⇄ ChatGPT:** en Hermes (`hermes*.tierraparaiso.net`) y en ChatGPT aparece el botón naranja **Pasar a…**. Muestra las conversaciones de Hermes y ChatGPT abiertas en el perfil y tú eliges a cuál va. **Alt+P** envía directo a la emparejada. Toma la última respuesta, o lo que tengas seleccionado, y lo pega en la caja de la conversación elegida. **No envía**: tú revisas y pulsas Enter.
 - **Lupa:** clic derecho › *Lupa* (o **Alt+L**). La página se amplía alrededor del cursor; la rueda del mouse amplía o reduce (de 1× a 8×) y al mover el mouse recorres la página. Los clics siguen funcionando. **Esc** o clic derecho para salir. Para ver nítido algo que vas a leer largo rato, Ctrl + rueda (zoom propio de Chrome) se ve más definido.
+- **Bóveda:** *A la Bóveda* (clic derecho o barra de selección) guarda el secreto seleccionado, o el de un campo de contraseña, en la Bóveda del equipo con nombre `servicio_entorno_tipo`. *Pegar desde la Bóveda* lo busca por nombre y lo pega en el campo activo. Requiere el ayudante local (`ayudante/LEEME.md`). Nada que parezca secreto va al historial, a la hoja ni al puente.
 - **Recortar una zona:** arrastras un recuadro y obtienes la imagen y el texto de esa parte de la página.
 
 ## Instalar en un perfil de Chrome (una vez por perfil)
@@ -15,12 +16,12 @@ Herramienta personal para Chrome, sobre Tampermonkey. Funciona en todos los siti
 Cada perfil de Chrome (cada cuenta de Google con su propia ventana) se instala aparte.
 
 1. **Tampermonkey:** instalarlo desde la [Chrome Web Store](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo). Después: clic derecho en su ícono › *Administrar extensión* › encender **Permitir secuencias de comandos de usuario** (*Allow User Scripts*). Sin ese interruptor no corre nada.
-2. **El script:** abrir [este enlace](https://raw.githubusercontent.com/steeveriano/tp-capturador/main/tp-capturador.user.js) y pulsar **Instalar**.
+2. **El script:** abrir [este enlace](https://raw.githubusercontent.com/sbntpnet/tp-capturador/v2.4.0/tp-capturador.user.js) y pulsar **Instalar**.
 3. **La activación:** abrir el *enlace de activación*, aceptar y escribir el nombre del perfil. El enlace está en la bóveda local del portátil con el nombre `tp_capturador_enlace_activacion` (se abre con `python boveda.py`; detalle en `gestion-data/_herramientas/BOVEDA.md`). Lleva la clave adentro: no se pega en chats ni en correos. **Atajo en el portátil para los pasos 2 y 3:** con la ventana del perfil al frente, doble clic en **Activar TP Capturador** del Escritorio. Abre el enlace de instalación, espera a que pulses Instalar y abre la activación sin mostrar la clave.
 
    **Cómo saber si quedó activado:** ícono de Tampermonkey › la última línea debe decir `Versión 2.0.0 · perfil: <nombre>`. Si dice `sin activar`, el resaltado y los menús funcionan, pero nada llega a la hoja.
 
-Las actualizaciones llegan solas: Tampermonkey revisa este repositorio y se instala la versión nueva.
+**Versión fija:** desde la 2.4.0 no hay actualización automática. Cada versión nueva se instala a mano desde el enlace de su etiqueta, con la aceptación de la ACH.
 
 Si hay un script viejo "Sales TierraParaíso — Capturador de Contactos", **hay que borrarlo** desde el panel de Tampermonkey.
 
@@ -36,7 +37,7 @@ Si hay un script viejo "Sales TierraParaíso — Capturador de Contactos", **hay
 
 ## Pedir un cambio
 
-En el clic derecho o en el menú de Tampermonkey está **Pedir un cambio a Claude Code**. Abre una solicitud (issue) en este repositorio con el sitio y la versión ya escritos. Claude Code la toma, cambia el código, prueba y publica. Tu navegador recibe la actualización sola.
+En el clic derecho o en el menú de Tampermonkey está **Pedir un cambio a Claude Code**. Abre una solicitud (issue) en este repositorio con el sitio y la versión ya escritos. Claude Code la toma, cambia el código, prueba y publica una versión nueva con su etiqueta, que se instala con la aceptación de la ACH.
 
 ## Dónde van los datos
 

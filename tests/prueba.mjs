@@ -142,7 +142,7 @@ await pagina.fill('#area', 'Clave$Segura2026');
 await pagina.evaluate(() => { const a = document.querySelector('#area'); a.focus(); a.select(); });
 await pagina.keyboard.press('Control+C');
 await pagina.waitForTimeout(50);
-ok(await pagina.evaluate(() => GM_getValue('historial', []).some((x) => x.texto.includes('Clave$'))), 'todo lo copiado entra al historial, también lo que parece clave');
+ok(!(await pagina.evaluate(() => GM_getValue('historial', []).some((x) => x.texto.includes('Clave$')))), 'lo que parece clave no entra al historial (Omitir secretos encendido)');
 ok(!(await enSombra('.toast')).some((t) => t.includes('parece una contraseña')), 'no aparece el aviso de contraseña');
 
 // 9. Clic derecho dentro de un campo con texto seleccionado ofrece Cortar
