@@ -55,6 +55,8 @@ const SHIM = (mem) => `
     const mem = ${JSON.stringify(mem)};
     window.GM_getValue = (k, d) => (k in mem ? JSON.parse(JSON.stringify(mem[k])) : d);
     window.GM_setValue = (k, v) => { mem[k] = JSON.parse(JSON.stringify(v)); window.__gmSet(k, mem[k]); };
+    window.GM_addValueChangeListener = () => 0;
+    window.GM_removeValueChangeListener = () => {};
     window.GM_setClipboard = (t) => { window.__clip = t; };
     window.GM_registerMenuCommand = (n) => { (window.__menu = window.__menu || []).push(n); };
     window.GM_addStyle = (c) => { const s = document.createElement('style'); s.textContent = c; document.head.appendChild(s); };

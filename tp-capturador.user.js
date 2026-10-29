@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TP Capturador
 // @namespace    https://github.com/steeveriano/tp-capturador
-// @version      2.3.1
-// @description  Contactos a Google Sheets, menú propio de clic derecho, historial del portapapeles, recorte de zonas y puente Hermes ⇄ ChatGPT.
+// @version      2.3.2
+// @description  Contactos a Google Sheets, menú propio de clic derecho, historial del portapapeles, recorte de zonas, post-its del día y puente Hermes ⇄ ChatGPT.
 // @author       Steeve Riaño · tierraparaiso
 // @homepageURL  https://github.com/steeveriano/tp-capturador
 // @supportURL   https://github.com/steeveriano/tp-capturador/issues
@@ -36,7 +36,7 @@
   'use strict';
   if (window.top !== window.self) return;
 
-  const VERSION = '2.3.1';
+  const VERSION = '2.3.2';
   const REPO = 'https://github.com/steeveriano/tp-capturador';
   const HOST = location.hostname;
 
@@ -53,6 +53,7 @@
     menuDerecho: true,     // menú propio en clic derecho
     omitirSecretos: false, // si se enciende, no guarda en el historial lo que parezca contraseña o token
     puenteEncabezado: true, // al pasar entre Hermes y ChatGPT, anteponer "[Respuesta de …]"
+    postits: true,         // pila de post-its en el borde derecho
   };
   const cfg = () => Object.assign({}, CFG_BASE, GM_getValue('cfg', {}));
   const setCfg = (cambios) => GM_setValue('cfg', Object.assign(cfg(), cambios));
@@ -124,6 +125,119 @@
     .puente { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
     .puente.hermes { right: 24px; }
     .puente.chatgpt { right: 22px; bottom: 120px; }
+
+    /* ── Post-its ── */
+    .menu .punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 8px; vertical-align: 1px; }
+    .pdock { position: fixed; right: 0; display: flex; align-items: flex-start; pointer-events: none; }
+    .pdock .pcol { width: 178px; display: flex; flex-direction: column; gap: 8px; padding: 0 8px 8px 10px; }
+    .pdock.plegado .pcol { display: none; }
+    .pdock .pcol > *, .pdock .ptab { pointer-events: auto; }
+    .ptab { all: unset; cursor: pointer; writing-mode: vertical-rl; transform: rotate(180deg); display: flex; align-items: center; gap: 7px;
+      padding: 12px 6px; background: #111827; color: #f9fafb; border: 1px solid #374151; border-left: 0; border-radius: 0 9px 9px 0;
+      font: 600 11px/1 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .06em; text-transform: uppercase; box-shadow: 0 6px 18px rgba(0,0,0,.3); user-select: none; }
+    .ptab:hover { background: #1f2937; }
+    .ptab b { background: #f59e0b; color: #111827; border-radius: 999px; padding: 4px 2px; min-height: 12px; text-align: center; font-size: 10px; letter-spacing: 0; }
+    .phead { background: #111827; color: #d1d5db; border: 1px solid #374151; border-radius: 9px; padding: 7px 8px; display: flex; flex-direction: column; gap: 7px;
+      font-size: 11px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+    .phead .fila { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+    .phead b { color: #f9fafb; font-size: 12px; }
+    .phead .pres { color: #9ca3af; font-size: 10.5px; margin-top: -4px; }
+    .pnuevo { all: unset; cursor: pointer; white-space: nowrap; padding: 3px 8px; border-radius: 6px; background: #b45309; color: #fff; font-size: 11px; font-weight: 600; }
+    .pnuevo:hover { background: #d97706; }
+    .pfiltros { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+    .pfiltros button { all: unset; cursor: pointer; }
+    .pfiltros .todas { padding: 2px 7px; border-radius: 999px; background: #374151; color: #e5e7eb; font-size: 10px; }
+    .pfiltros .todas.on { background: #f9fafb; color: #111827; }
+    .pfiltros .dot { width: 13px; height: 13px; border-radius: 50%; background: var(--c); opacity: .5; }
+    .pfiltros .dot:hover { opacity: .85; }
+    .pfiltros .dot.on { opacity: 1; box-shadow: 0 0 0 2px #111827, 0 0 0 3.5px #f9fafb; }
+    .plista { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding: 2px 4px 4px 2px; margin: -2px -4px 0 -2px; scrollbar-width: thin; }
+    .pvacio { background: #fffdf7; color: #4b5563; border-radius: 6px; padding: 10px; font-size: 11.5px; line-height: 1.4; box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+    .pmini { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; gap: 5px; width: 100%; padding: 8px 10px 9px;
+      background: color-mix(in srgb, var(--c) 13%, #fffdf6); color: #1f2937; border-top: 3px solid var(--c); border-radius: 2px 2px 4px 14px;
+      box-shadow: 0 1px 2px rgba(0,0,0,.14), 0 6px 14px rgba(0,0,0,.16); transition: transform .12s ease, box-shadow .12s ease;
+      font: 12px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .pmini:hover { transform: translateX(-3px); box-shadow: 0 2px 4px rgba(0,0,0,.16), 0 10px 22px rgba(0,0,0,.22); }
+    .pmini.activa { outline: 2px solid var(--c); outline-offset: 2px; }
+    .pmini.lista { opacity: .72; }
+    .pmini.lista .pm-t { text-decoration: line-through; text-decoration-color: rgba(0,0,0,.35); }
+    .pm-cat { display: flex; justify-content: space-between; gap: 6px; font-size: 9.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+      color: color-mix(in srgb, var(--c) 72%, #000); }
+    .pm-edad { color: #6b7280; letter-spacing: 0; text-transform: none; font-weight: 600; }
+    .pm-t { font-size: 12.5px; font-weight: 600; color: #111827; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+    .pm-prog { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: #4b5563; }
+    .pm-barra { flex: 1; height: 4px; border-radius: 2px; background: rgba(0,0,0,.09); overflow: hidden; }
+    .pm-barra i { display: block; height: 100%; background: var(--c); }
+    .ptarjeta { position: fixed; width: 330px; max-height: 82vh; display: flex; flex-direction: column; overflow: hidden;
+      background: color-mix(in srgb, var(--c) 9%, #fffdf8); color: #1f2937; border-top: 5px solid var(--c); border-radius: 4px 4px 8px 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,.14), 0 20px 44px rgba(0,0,0,.3); font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .pt-cab { display: flex; align-items: center; gap: 2px; padding: 9px 8px 0 12px; }
+    .pt-esp { flex: 1; }
+    .pt-chip { all: unset; cursor: pointer; padding: 3px 9px; border-radius: 999px; background: var(--c); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+    .pt-icono { all: unset; cursor: pointer; padding: 4px 7px; border-radius: 6px; color: #4b5563; font-size: 11.5px; }
+    .pt-icono:hover { background: rgba(0,0,0,.07); color: #111827; }
+    .pt-cats { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 12px 2px; }
+    .pt-cats[hidden] { display: none; }
+    .pt-cat { all: unset; cursor: pointer; padding: 3px 9px; border-radius: 999px; font-size: 11px; border: 1.5px solid var(--k, #9ca3af); color: color-mix(in srgb, var(--k, #6b7280) 75%, #000); background: #fff; }
+    .pt-cat.on { background: var(--k); color: #fff; }
+    .pt-cat.editar { border-style: dashed; border-color: #9ca3af; color: #4b5563; }
+    .pt-titulo { all: unset; display: block; margin: 8px 12px 4px; font-size: 16px; font-weight: 700; color: #111827; }
+    .pt-titulo::placeholder, .pt-nueva-in::placeholder, .pt-contexto::placeholder { color: #9ca3af; font-weight: 400; }
+    .pt-lista { overflow-y: auto; padding: 2px 6px; scrollbar-width: thin; }
+    .pt-fila { display: flex; align-items: flex-start; gap: 8px; padding: 4px 6px; border-radius: 6px; }
+    .pt-fila:hover { background: rgba(0,0,0,.04); }
+    .pt-fila .pt-icono { visibility: hidden; padding: 0 6px; font-size: 15px; line-height: 20px; }
+    .pt-fila:hover .pt-icono { visibility: visible; }
+    .pt-check { all: unset; box-sizing: border-box; cursor: pointer; flex: none; width: 16px; height: 16px; margin-top: 2px; border: 1.5px solid #6b7280; border-radius: 4px;
+      background: #fff; display: grid; place-items: center; }
+    .pt-check.on { background: var(--c); border-color: var(--c); }
+    .pt-check.on::after { content: ''; width: 7px; height: 3.5px; border-left: 2px solid #fff; border-bottom: 2px solid #fff; transform: translateY(-1px) rotate(-45deg); }
+    .pt-texto { all: unset; flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word; field-sizing: content; min-height: 1.4em; max-height: 8.4em; overflow: auto; color: #1f2937; }
+    .pt-fila.hecha .pt-texto { text-decoration: line-through; color: #6b7280; }
+    .pt-link { color: #6b7280; text-decoration: none; font-size: 12px; line-height: 20px; }
+    .pt-link:hover { color: #111827; }
+    .pt-nueva { display: flex; align-items: center; gap: 8px; margin: 4px 12px 0; padding: 7px 0 5px; border-top: 1px dashed rgba(0,0,0,.16); }
+    .pt-mas { width: 16px; text-align: center; color: #9ca3af; font-weight: 700; }
+    .pt-nueva-in { all: unset; flex: 1; color: #1f2937; }
+    .pt-contexto { all: unset; display: block; margin: 6px 12px 0; padding: 7px 9px; background: rgba(255,255,255,.7); border: 1px solid rgba(0,0,0,.08); border-radius: 6px;
+      font-size: 12.5px; white-space: pre-wrap; word-break: break-word; field-sizing: content; min-height: 2.8em; max-height: 9em; overflow: auto; color: #1f2937; }
+    .pt-pie { display: flex; justify-content: space-between; padding: 8px 12px 10px; font-size: 11px; color: #6b7280; }
+    .pvelo { position: fixed; inset: 0; background: rgba(17,24,39,.5); display: grid; place-items: center; }
+    .pmodal { width: min(560px, 92vw); max-height: 86vh; display: flex; flex-direction: column; overflow: hidden; background: #111827; color: #f9fafb;
+      border: 1px solid #374151; border-radius: 12px; box-shadow: 0 24px 60px rgba(0,0,0,.45); font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .pmodal.pequeno { width: min(460px, 92vw); }
+    .pmodal header { padding: 18px 20px 8px; }
+    .pmodal h2 { margin: 0 0 4px; font-size: 18px; font-weight: 700; }
+    .pmodal header p { margin: 0; color: #9ca3af; }
+    .pm-acciones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 10px 20px 4px; }
+    .pm-acciones button { all: unset; cursor: pointer; display: flex; flex-direction: column; gap: 3px; padding: 10px 11px; border-radius: 9px; background: #1f2937; border: 1px solid #374151; }
+    .pm-acciones button:hover { border-color: #6b7280; }
+    .pm-acciones button.prim { background: #b45309; border-color: #b45309; }
+    .pm-acciones button.prim:hover { background: #d97706; }
+    .pm-acciones b { font-size: 13px; }
+    .pm-acciones small { font-size: 11px; color: #d1d5db; line-height: 1.3; }
+    .pm-acciones button:not(.prim) small { color: #9ca3af; }
+    .pm-sub { padding: 12px 20px 4px; color: #9ca3af; font-size: 11.5px; }
+    .pm-lista { overflow-y: auto; padding: 2px 12px 8px; scrollbar-width: thin; }
+    .pm-nota { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 7px; cursor: pointer; }
+    .pm-nota:hover { background: #1f2937; }
+    .pm-nota.fuera .pm-nt { text-decoration: line-through; color: #6b7280; }
+    .pm-nota .pt-check { margin: 0; border-color: #6b7280; background: transparent; }
+    .pm-nota .pt-check.on { background: var(--c); border-color: var(--c); }
+    .pm-cat-dot { flex: none; width: 82px; font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: color-mix(in srgb, var(--c) 55%, #fff); }
+    .pm-nt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pm-np { color: #9ca3af; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .pmodal footer { display: flex; align-items: center; gap: 8px; padding: 10px 20px 14px; border-top: 1px solid #374151; }
+    .pmodal footer button { all: unset; cursor: pointer; padding: 7px 12px; border-radius: 7px; background: #1f2937; color: #e5e7eb; font-size: 12.5px; }
+    .pmodal footer button:hover { background: #374151; }
+    .pmodal footer button.prim { background: #f9fafb; color: #111827; font-weight: 600; }
+    .pc-fila { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 7px; }
+    .pc-fila:hover { background: #1f2937; }
+    .pc-color { all: unset; cursor: pointer; width: 18px; height: 18px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px #111827, 0 0 0 3px #4b5563; }
+    .pc-nombre { all: unset; flex: 1; padding: 4px 7px; border-radius: 5px; background: #1f2937; color: #f9fafb; }
+    .pc-usos { color: #9ca3af; font-size: 11px; width: 70px; text-align: right; }
+    .pc-quitar { all: unset; cursor: pointer; color: #fca5a5; font-size: 11.5px; padding: 3px 6px; border-radius: 5px; }
+    .pc-quitar:hover { background: #3f1d1d; }
   `;
 
   let raiz = null;
@@ -140,8 +254,15 @@
       // Evita que un clic en la interfaz robe el foco del campo donde se va a pegar.
       sombra.addEventListener('mousedown', (e) => {
         const t = e.composedPath()[0];
-        if (!(t instanceof HTMLInputElement) && !(t instanceof HTMLTextAreaElement)) e.preventDefault();
+        if (!(t instanceof HTMLInputElement) && !(t instanceof HTMLTextAreaElement) && !(t instanceof HTMLSelectElement)) e.preventDefault();
       });
+      // Lo que se escribe en un campo de la interfaz no llega a los atajos de teclado de la página.
+      for (const tipo of ['keydown', 'keyup', 'keypress']) {
+        sombra.addEventListener(tipo, (e) => {
+          const t = e.composedPath()[0];
+          if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) e.stopPropagation();
+        });
+      }
     }
     (document.body || document.documentElement).appendChild(raiz);
     return sombra;
@@ -565,6 +686,7 @@
       items.push(boton('Copiar', () => copiar(sel), 'Ctrl+C'));
       if (destino.editable) items.push(boton('Cortar', () => cortarEn(destino), 'Ctrl+X'));
       items.push(boton('Guardar en la hoja', () => guardar({ tipo: 'texto', valor: sel })));
+      items.push(boton('Agregar post-it…', () => menuPostit(sel.trim(), x, y)));
       items.push(boton('Buscar en Google', () => GM_openInTab('https://www.google.com/search?q=' + encodeURIComponent(sel.slice(0, 300)), { active: true })));
       items.push(sep());
     }
@@ -600,6 +722,7 @@
     items.push(boton('Recortar una zona…', iniciarRecorte));
     items.push(boton('Lupa (rueda para ampliar)', () => iniciarLupa(x, y), 'Alt+L'));
     if (!destino.editable) items.push(boton('Historial del portapapeles', () => abrirHistorial(null), 'Alt+V'));
+    items.push(boton('Nuevo post-it', () => crearNota('')));
     items.push(boton('Copiar título y dirección', () => copiar(document.title + '\n' + location.href)));
     items.push(boton('Guardar esta página en la hoja', () => guardar({ tipo: 'pagina', valor: location.origin + location.pathname, nota: document.title })));
     items.push(sep());
@@ -631,6 +754,7 @@
       boton('Guardar', () => guardar(contacto ? { tipo: contacto.tipo, valor: contacto.valor } : { tipo: 'texto', valor: texto })),
       contacto && contacto.tipo === 'telefono' ? boton('WhatsApp', () => GM_openInTab('https://wa.me/' + contacto.valor.replace(/\D/g, ''), { active: true })) : null,
       boton('Buscar', () => GM_openInTab('https://www.google.com/search?q=' + encodeURIComponent(t.slice(0, 300)), { active: true })),
+      boton('Post-it', () => menuPostit(t, rect.left, rect.bottom + 8)),
       boton('Recortar', iniciarRecorte),
     ].filter(Boolean);
     const nodo = h('div', { class: 'barra' }, botones);
@@ -699,6 +823,495 @@
     buscar.focus();
   }
 
+
+  // ───────────────────────── Post-its ─────────────────────────
+  // Notas flotantes con lista de tareas y categoría, pegadas al borde derecho de la pantalla.
+  // Viven solo en este perfil de Chrome y se ven igual en todas sus pestañas.
+  // Cada día nuevo (hora de Bogotá) se pregunta qué hacer con las del día anterior.
+  const CATS_BASE = [
+    { id: 'urgente', nombre: 'Urgente', color: '#dc2626' },
+    { id: 'comercial', nombre: 'Comercial', color: '#059669' },
+    { id: 'operacion', nombre: 'Operación', color: '#d97706' },
+    { id: 'desarrollo', nombre: 'Desarrollo', color: '#2563eb' },
+    { id: 'gestion', nombre: 'Gestión', color: '#7c3aed' },
+    { id: 'personal', nombre: 'Personal', color: '#db2777' },
+    { id: 'ideas', nombre: 'Ideas', color: '#64748b' },
+  ];
+  const PALETA = ['#dc2626', '#ea580c', '#d97706', '#65a30d', '#059669', '#0891b2', '#2563eb', '#7c3aed', '#db2777', '#64748b'];
+  const PAPELERA_DIAS = 7;
+  const ID_TAB = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const nid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const fechaBogota = (t) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(t ? new Date(t) : new Date());
+  const hoyBogota = () => fechaBogota();
+  const diaLargo = (iso) => new Intl.DateTimeFormat('es-CO', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(iso + 'T12:00:00Z'));
+  const diaCorto = (iso) => new Intl.DateTimeFormat('es-CO', { timeZone: 'UTC', day: 'numeric', month: 'short' }).format(new Date(iso + 'T12:00:00Z')).replace(' de ', ' ').replace('.', '');
+  const diasEntre = (a, b) => Math.round((Date.parse(b + 'T12:00:00Z') - Date.parse(a + 'T12:00:00Z')) / 864e5);
+  const corto = (t, n) => { t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
+
+  const categorias = () => { const c = GM_getValue('postits:cats', null); return Array.isArray(c) && c.length ? c : CATS_BASE; };
+  // Si la categoría de un post-it ya no existe, pasa a «Gestión» o, si tampoco existe, a la primera.
+  const respaldoCat = (lista) => lista.find((c) => c.id === 'gestion') || lista[0];
+  const categoria = (id) => { const l = categorias(); return l.find((c) => c.id === id) || respaldoCat(l); };
+  function estadoNotas() {
+    const e = GM_getValue('postits', null) || {};
+    return { dia: e.dia || '', notas: Array.isArray(e.notas) ? e.notas : [], papelera: Array.isArray(e.papelera) ? e.papelera : [] };
+  }
+  function mutarNotas(fn) {
+    const e = estadoNotas();
+    fn(e);
+    const limite = Date.now() - PAPELERA_DIAS * 864e5;
+    e.papelera = e.papelera.filter((n) => n.borrada > limite).slice(0, 100);
+    GM_setValue('postits', e);
+    pintarPostits();
+    return e;
+  }
+  const buscarNota = (e, id) => e.notas.find((n) => n.id === id);
+  const origenActual = () => ({ url: location.origin + location.pathname, pagina: corto(document.title || HOST, 120) });
+  const tituloDe = (n) => n.titulo || (n.items[0] && corto(n.items[0].texto, 80)) || corto(n.contexto, 80) || 'Sin título';
+
+  function crearNota(texto) {
+    const id = nid();
+    const ultima = GM_getValue('postits:ultimaCat', 'gestion');
+    mutarNotas((e) => {
+      e.notas.unshift({
+        id, titulo: '', cat: categoria(ultima).id, contexto: '', creada: Date.now(),
+        items: texto ? [Object.assign({ id: nid(), texto: texto.slice(0, 1000), hecho: false, t: Date.now() }, origenActual())] : [],
+      });
+    });
+    if (!cfg().postits) setCfg({ postits: true });
+    abrirTarjeta(id, { foco: 'titulo' });
+  }
+  function agregarTarea(id, texto, conOrigen) {
+    mutarNotas((e) => {
+      const n = buscarNota(e, id);
+      if (n) n.items.push(Object.assign({ id: nid(), texto: texto.slice(0, 1000), hecho: false, t: Date.now() }, conOrigen ? origenActual() : {}));
+    });
+  }
+  function borrarNota(id) {
+    mutarNotas((e) => {
+      const n = buscarNota(e, id);
+      if (!n) return;
+      e.notas = e.notas.filter((x) => x.id !== id);
+      e.papelera.unshift(Object.assign(n, { borrada: Date.now() }));
+    });
+  }
+  function textoDeNota(n) {
+    return [tituloDe(n) + ' [' + categoria(n.cat).nombre + ']']
+      .concat(n.items.map((i) => (i.hecho ? '[x] ' : '[ ] ') + i.texto))
+      .concat(n.contexto ? ['', n.contexto] : []).join('\n');
+  }
+
+  // Menú «Agregar post-it»: nuevo con lo seleccionado, o como tarea de uno existente.
+  function menuPostit(texto, x, y) {
+    const e = estadoNotas();
+    const items = [seccion('Agregar post-it'), h('div', { class: 'valor' }, corto(texto, 60)),
+      boton('Nuevo post-it con esto', () => crearNota(texto))];
+    if (e.notas.length) {
+      items.push(sep(), seccion('Agregar como tarea a'));
+      for (const n of e.notas.slice(0, 10)) {
+        const c = categoria(n.cat);
+        items.push(boton([h('i', { class: 'punto', style: '--c:' + c.color }), corto(tituloDe(n), 34)], () => {
+          agregarTarea(n.id, texto, true);
+          toast('Agregado a «' + corto(tituloDe(n), 40) + '».', 'ok');
+        }));
+      }
+    }
+    abrir(h('div', { class: 'menu' }, items), x, y, 'postit');
+  }
+
+  // ── Pila flotante (dock) ──
+  let dock = null;
+  let filtroCat = null;
+  let arrastrado = false;
+  const uiNotas = () => GM_getValue('postits:ui', {}) || {};
+
+  function pintarPostits() {
+    if (!cfg().postits) { if (dock) { dock.remove(); dock = null; } return; }
+    const s = ui();
+    const u = uiNotas();
+    const e = estadoNotas();
+    const hoy = hoyBogota();
+    if (!dock || !dock.isConnected) { dock = h('div', { class: 'pdock' }); s.insertBefore(dock, s.children[1] || null); }
+    const alto = window.innerHeight;
+    const top = Math.max(8, Math.min(Math.round((u.y ?? 0.22) * alto), alto - 140));
+    dock.style.top = top + 'px';
+    dock.classList.toggle('plegado', !!u.plegado);
+    const pendientes = e.notas.reduce((a, n) => a + n.items.filter((i) => !i.hecho).length, 0);
+
+    const pestana = h('button', { class: 'ptab', title: 'Post-its · clic: mostrar u ocultar (Alt+N) · arrastra para moverlos' },
+      h('span', null, 'Post-its'), h('b', null, String(e.notas.length)));
+    pestana.addEventListener('mousedown', (ev) => {
+      if (ev.button !== 0) return;
+      const y0 = ev.clientY, t0 = dock.getBoundingClientRect().top;
+      let movio = false;
+      const mover = (m) => {
+        if (Math.abs(m.clientY - y0) > 4) movio = true;
+        if (movio) dock.style.top = Math.max(8, Math.min(t0 + m.clientY - y0, window.innerHeight - 140)) + 'px';
+      };
+      const soltar = () => {
+        window.removeEventListener('mousemove', mover, true);
+        window.removeEventListener('mouseup', soltar, true);
+        if (movio) { arrastrado = true; GM_setValue('postits:ui', Object.assign(uiNotas(), { y: parseFloat(dock.style.top) / window.innerHeight })); pintarPostits(); }
+      };
+      window.addEventListener('mousemove', mover, true);
+      window.addEventListener('mouseup', soltar, true);
+    });
+    pestana.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      if (arrastrado) { arrastrado = false; return; }
+      plegarNotas();
+    });
+
+    const usadas = categorias().filter((c) => e.notas.some((n) => categoria(n.cat).id === c.id));
+    if (filtroCat && !usadas.some((c) => c.id === filtroCat)) filtroCat = null;
+    const filtros = usadas.length > 1 ? h('div', { class: 'pfiltros' },
+      h('button', { class: 'todas' + (filtroCat ? '' : ' on'), on: { click: (ev) => { ev.stopPropagation(); filtroCat = null; pintarPostits(); } } }, 'Todas'),
+      usadas.map((c) => h('button', {
+        class: 'dot' + (filtroCat === c.id ? ' on' : ''), style: '--c:' + c.color, title: c.nombre,
+        on: { click: (ev) => { ev.stopPropagation(); filtroCat = filtroCat === c.id ? null : c.id; pintarPostits(); } },
+      }))) : null;
+
+    const cabeza = h('div', { class: 'phead' },
+      h('div', { class: 'fila' },
+        h('b', null, 'Hoy · ' + diaCorto(hoy)),
+        h('button', { class: 'pnuevo', title: 'Nuevo post-it', on: { click: (ev) => { ev.stopPropagation(); crearNota(''); } } }, '+ Nuevo')),
+      h('div', { class: 'pres' }, e.notas.length ? `${pendientes} por hacer · ${e.notas.length} post-its` : 'Sin post-its'),
+      filtros);
+
+    const visibles = e.notas.filter((n) => !filtroCat || categoria(n.cat).id === filtroCat);
+    const minis = visibles.map((n) => {
+      const c = categoria(n.cat);
+      const hechas = n.items.filter((i) => i.hecho).length, total = n.items.length;
+      const edad = diasEntre(fechaBogota(n.creada), hoy);
+      return h('button', {
+        class: 'pmini' + (tarjeta && tarjeta.id === n.id ? ' activa' : '') + (total && hechas === total ? ' lista' : ''),
+        style: '--c:' + c.color, title: tituloDe(n),
+        on: { click: (ev) => { ev.stopPropagation(); if (tarjeta && tarjeta.id === n.id) cerrarTarjeta(); else abrirTarjeta(n.id); } },
+      },
+      h('span', { class: 'pm-cat' }, h('span', null, c.nombre), edad >= 1 ? h('span', { class: 'pm-edad', title: 'Viene de días anteriores' }, edad + ' d') : null),
+      h('span', { class: 'pm-t' }, tituloDe(n)),
+      total
+        ? h('span', { class: 'pm-prog' }, h('span', { class: 'pm-barra' }, h('i', { style: 'width:' + Math.round((hechas / total) * 100) + '%' })), h('span', null, hechas + '/' + total))
+        : h('span', { class: 'pm-prog' }, n.contexto ? 'nota' : 'sin tareas'));
+    });
+    const vacio = e.notas.length ? null : h('div', { class: 'pvacio' }, 'Sin post-its. Selecciona un texto › clic derecho › Agregar post-it, o pulsa «+ Nuevo».');
+    const columna = h('div', { class: 'pcol' }, cabeza, h('div', { class: 'plista' }, minis, vacio));
+    columna.querySelector('.plista').style.maxHeight = Math.max(140, alto - top - (filtros ? 130 : 110)) + 'px';
+    dock.replaceChildren(columna, pestana);
+  }
+
+  function plegarNotas(forzar) {
+    if (!cfg().postits) { setCfg({ postits: true }); GM_setValue('postits:ui', Object.assign(uiNotas(), { plegado: false })); pintarPostits(); return; }
+    const plegado = forzar !== undefined ? forzar : !uiNotas().plegado;
+    GM_setValue('postits:ui', Object.assign(uiNotas(), { plegado }));
+    if (plegado) cerrarTarjeta();
+    pintarPostits();
+  }
+
+  // ── Tarjeta abierta (detalle de un post-it) ──
+  let tarjeta = null; // { id, nodo }
+  const temporizadores = new Map();
+  function guardarLuego(clave, fn) {
+    const previo = temporizadores.get(clave);
+    if (previo) clearTimeout(previo.t);
+    temporizadores.set(clave, { fn, t: setTimeout(() => { temporizadores.delete(clave); fn(); }, 350) });
+  }
+  function guardarYa() {
+    for (const [clave, p] of [...temporizadores]) { clearTimeout(p.t); temporizadores.delete(clave); p.fn(); }
+  }
+  function descartarPendientes() {
+    for (const p of temporizadores.values()) clearTimeout(p.t);
+    temporizadores.clear();
+  }
+  const enfocadoEn = (nodo) => { const a = sombra && sombra.activeElement; return !!a && nodo.contains(a); };
+
+  function cerrarTarjeta() {
+    if (!tarjeta) return;
+    guardarYa();
+    const id = tarjeta.id;
+    tarjeta.nodo.remove();
+    tarjeta = null;
+    // Un post-it recién creado y abandonado sin escribir nada no se queda.
+    const n = buscarNota(estadoNotas(), id);
+    if (n && !n.titulo && !n.items.length && !n.contexto) mutarNotas((e) => { e.notas = e.notas.filter((x) => x.id !== id); });
+    else pintarPostits();
+  }
+
+  function abrirTarjeta(id, opciones) {
+    if (tarjeta) cerrarTarjeta();
+    if (!buscarNota(estadoNotas(), id)) return;
+    if (uiNotas().plegado) GM_setValue('postits:ui', Object.assign(uiNotas(), { plegado: false }));
+    const nodo = h('div', { class: 'ptarjeta' });
+    nodo.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); cerrarTarjeta(); } });
+    tarjeta = { id, nodo };
+    ui().appendChild(nodo);
+    pintarPostits();
+    pintarTarjeta(opciones);
+  }
+
+  function ubicarTarjeta() {
+    if (!tarjeta) return;
+    const n = tarjeta.nodo;
+    const d = dock && dock.isConnected ? dock.getBoundingClientRect() : { left: window.innerWidth, top: 80 };
+    const r = n.getBoundingClientRect();
+    n.style.left = Math.max(8, d.left - r.width - 10) + 'px';
+    n.style.top = Math.max(8, Math.min(d.top, window.innerHeight - r.height - 8)) + 'px';
+  }
+
+  function pintarTarjeta(opciones) {
+    if (!tarjeta) return;
+    const o = opciones || {};
+    const id = tarjeta.id;
+    const n = buscarNota(estadoNotas(), id);
+    if (!n) { tarjeta.nodo.remove(); tarjeta = null; return; }
+    const c = categoria(n.cat);
+    const nodo = tarjeta.nodo;
+    nodo.style.setProperty('--c', c.color);
+    const cambiar = (fn) => mutarNotas((e) => { const x = buscarNota(e, id); if (x) fn(x); });
+    const icono = (texto, titulo, fn) => h('button', { class: 'pt-icono', title: titulo, on: { click: (ev) => { ev.stopPropagation(); fn(); } } }, texto);
+
+    const titulo = h('input', { class: 'pt-titulo', type: 'text', placeholder: 'Título del post-it', maxlength: '120' });
+    titulo.value = n.titulo;
+    titulo.addEventListener('input', () => guardarLuego('titulo', () => cambiar((x) => { x.titulo = titulo.value.trim(); })));
+    titulo.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); nueva.focus(); } });
+
+    const filas = n.items.map((it) => {
+      const caja = h('textarea', { class: 'pt-texto', rows: '1', maxlength: '1000' });
+      caja.value = it.texto;
+      caja.addEventListener('input', () => guardarLuego('item:' + it.id, () => cambiar((x) => { const i = x.items.find((y) => y.id === it.id); if (i) i.texto = caja.value; })));
+      caja.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); nueva.focus(); } });
+      caja.addEventListener('blur', () => {
+        if (caja.value.trim()) return;
+        guardarYa();
+        cambiar((x) => { x.items = x.items.filter((y) => y.id !== it.id); });
+        pintarTarjeta();
+      });
+      return h('div', { class: 'pt-fila' + (it.hecho ? ' hecha' : '') },
+        h('button', {
+          class: 'pt-check' + (it.hecho ? ' on' : ''), role: 'checkbox', 'aria-checked': String(!!it.hecho), title: it.hecho ? 'Marcar como pendiente' : 'Marcar como hecha',
+          on: { click: (ev) => { ev.stopPropagation(); guardarYa(); cambiar((x) => { const i = x.items.find((y) => y.id === it.id); if (i) i.hecho = !i.hecho; }); pintarTarjeta(); } },
+        }),
+        caja,
+        it.url ? h('a', { class: 'pt-link', href: it.url, target: '_blank', rel: 'noopener', title: 'De: ' + (it.pagina || it.url) }, '↗') : null,
+        icono('×', 'Quitar esta tarea', () => { guardarYa(); cambiar((x) => { x.items = x.items.filter((y) => y.id !== it.id); }); pintarTarjeta(); }));
+    });
+
+    const nueva = h('input', { class: 'pt-nueva-in', type: 'text', placeholder: 'Agregar tarea y pulsar Enter', maxlength: '1000' });
+    nueva.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter' || !nueva.value.trim()) return;
+      ev.preventDefault();
+      guardarYa();
+      const t = nueva.value.trim();
+      cambiar((x) => x.items.push({ id: nid(), texto: t, hecho: false, t: Date.now() }));
+      pintarTarjeta({ foco: 'nueva' });
+    });
+
+    const contexto = h('textarea', { class: 'pt-contexto', placeholder: 'Notas de contexto…', maxlength: '4000' });
+    contexto.value = n.contexto || '';
+    contexto.addEventListener('input', () => guardarLuego('contexto', () => cambiar((x) => { x.contexto = contexto.value; })));
+
+    let selector = null;
+    const chip = h('button', { class: 'pt-chip', title: 'Cambiar la categoría', on: { click: (ev) => { ev.stopPropagation(); selector.hidden = !selector.hidden; } } }, c.nombre + ' ▾');
+    selector = h('div', { class: 'pt-cats' },
+      categorias().map((k) => h('button', {
+        class: 'pt-cat' + (k.id === c.id ? ' on' : ''), style: '--k:' + k.color,
+        on: { click: (ev) => { ev.stopPropagation(); GM_setValue('postits:ultimaCat', k.id); cambiar((x) => { x.cat = k.id; }); pintarTarjeta(); } },
+      }, k.nombre)),
+      h('button', { class: 'pt-cat editar', on: { click: (ev) => { ev.stopPropagation(); editarCategorias(); } } }, 'Editar categorías…'));
+    selector.hidden = true;
+
+    const hechas = n.items.filter((i) => i.hecho).length;
+    nodo.replaceChildren(
+      h('div', { class: 'pt-cab' }, chip, h('span', { class: 'pt-esp' }),
+        icono('Copiar', 'Copiar como texto', () => { guardarYa(); copiar(textoDeNota(buscarNota(estadoNotas(), id))); toast('Post-it copiado.', 'ok'); }),
+        icono('Borrar', 'Mover a la papelera (se recupera durante 7 días)', () => { descartarPendientes(); tarjeta.nodo.remove(); tarjeta = null; borrarNota(id); toast('Post-it borrado. Se recupera 7 días desde el menú de Tampermonkey.', 'aviso'); }),
+        icono('✕', 'Cerrar (Esc)', cerrarTarjeta)),
+      selector, titulo,
+      h('div', { class: 'pt-lista' }, filas),
+      h('div', { class: 'pt-nueva' }, h('span', { class: 'pt-mas' }, '+'), nueva),
+      contexto,
+      h('div', { class: 'pt-pie' },
+        h('span', null, n.items.length ? hechas + ' de ' + n.items.length + ' hechas' : 'Sin tareas'),
+        h('span', null, 'desde ' + diaCorto(fechaBogota(n.creada)))));
+    ubicarTarjeta();
+    if (o.foco === 'titulo') titulo.focus();
+    else if (o.foco === 'nueva') nueva.focus();
+  }
+
+  // ── Categorías ──
+  function editarCategorias() {
+    cerrar();
+    const s = ui();
+    const velo = h('div', { class: 'pvelo' });
+    const caja = h('div', { class: 'pmodal pequeno' });
+    velo.append(caja);
+    const salir = () => { velo.remove(); pintarPostits(); if (tarjeta) pintarTarjeta(); };
+    velo.addEventListener('click', (ev) => { if (ev.target === velo) salir(); });
+    velo.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') salir(); });
+    const guardarCats = (lista) => { GM_setValue('postits:cats', lista); pintar(); };
+    function pintar() {
+      const lista = categorias().map((c) => Object.assign({}, c));
+      const usos = (id) => estadoNotas().notas.filter((n) => categoria(n.cat).id === id).length;
+      caja.replaceChildren(
+        h('header', null, h('h2', null, 'Categorías de post-its'), h('p', null, 'Clic en el color para cambiarlo. Los cambios se ven en todas las pestañas de este perfil.')),
+        h('div', { class: 'pm-lista' }, lista.map((c, i) => {
+          const nombre = h('input', { class: 'pc-nombre', type: 'text', maxlength: '24' });
+          nombre.value = c.nombre;
+          nombre.addEventListener('change', () => { if (nombre.value.trim()) { lista[i].nombre = nombre.value.trim(); guardarCats(lista); } });
+          return h('div', { class: 'pc-fila' },
+            h('button', { class: 'pc-color', style: '--c:' + c.color, title: 'Cambiar color', on: { click: () => { lista[i].color = PALETA[(PALETA.indexOf(c.color) + 1) % PALETA.length]; guardarCats(lista); } } }),
+            nombre,
+            h('span', { class: 'pc-usos' }, usos(c.id) + ' post-its'),
+            lista.length > 1 ? h('button', {
+              class: 'pc-quitar', title: 'Quitar categoría',
+              on: { click: () => {
+                const n = usos(c.id);
+                if (n && !confirm(`${n} post-its usan «${c.nombre}». Pasarán a «${respaldoCat(lista.filter((x) => x.id !== c.id)).nombre}». ¿Quitar la categoría?`)) return;
+                guardarCats(lista.filter((x) => x.id !== c.id));
+              } },
+            }, 'Quitar') : null);
+        })),
+        h('footer', null,
+          h('button', { on: { click: () => { if (confirm('¿Volver a las 7 categorías iniciales?')) { GM_setValue('postits:cats', null); pintar(); } } } }, 'Restablecer'),
+          h('span', { class: 'pt-esp' }),
+          h('button', { on: { click: () => {
+            const nombre = (prompt('Nombre de la nueva categoría:') || '').trim().slice(0, 24);
+            if (!nombre) return;
+            const usados = new Set(lista.map((x) => x.color));
+            lista.push({ id: 'c' + nid(), nombre, color: PALETA.find((p) => !usados.has(p)) || PALETA[lista.length % PALETA.length] });
+            guardarCats(lista);
+          } } }, '+ Nueva categoría'),
+          h('button', { class: 'prim', on: { click: salir } }, 'Listo')));
+    }
+    s.appendChild(velo);
+    pintar();
+  }
+
+  // ── Papelera ──
+  function recuperarNotas() {
+    const e = estadoNotas();
+    if (!e.papelera.length) { toast('La papelera de post-its está vacía.', 'ok'); return; }
+    const items = [seccion('Post-its borrados · últimos 7 días')];
+    for (const n of e.papelera.slice(0, 15)) {
+      items.push(boton([h('i', { class: 'punto', style: '--c:' + categoria(n.cat).color }), corto(tituloDe(n), 34)], () => {
+        mutarNotas((x) => {
+          const i = x.papelera.findIndex((y) => y.id === n.id);
+          if (i < 0) return;
+          const [r] = x.papelera.splice(i, 1);
+          delete r.borrada;
+          x.notas.unshift(r);
+        });
+        if (!cfg().postits) setCfg({ postits: true });
+        toast('Recuperado: ' + corto(tituloDe(n), 50), 'ok');
+      }, diaCorto(fechaBogota(n.borrada))));
+    }
+    abrir(h('div', { class: 'menu' }, items), window.innerWidth / 2 - 150, 90, 'papelera');
+  }
+
+  // ── Día nuevo: qué hacer con los post-its del día anterior ──
+  let modalDia = null;
+  function revisarDia(forzar) {
+    if (!cfg().postits && !forzar) return;
+    const hoy = hoyBogota();
+    const e = estadoNotas();
+    if (!forzar && e.dia === hoy) return;
+    if (!e.notas.length) { if (e.dia !== hoy) mutarNotas((x) => { x.dia = hoy; }); if (forzar) toast('No hay post-its para revisar.', 'ok'); return; }
+    if (modalDia) return;
+    if (!forzar) {
+      if (Date.now() < GM_getValue('postits:pospuesto', 0)) return;
+      const cerrojo = GM_getValue('postits:revision', null);
+      if (cerrojo && cerrojo.id !== ID_TAB && Date.now() - cerrojo.t < 5 * 60e3) return; // otra pestaña ya está preguntando
+    }
+    GM_setValue('postits:revision', { id: ID_TAB, t: Date.now() });
+    mostrarDia(e, hoy, !!forzar);
+  }
+
+  function mostrarDia(e, hoy, forzado) {
+    const ids = e.notas.map((n) => n.id);
+    const mantener = new Set(ids);
+    const pend = e.notas.reduce((a, n) => a + n.items.filter((i) => !i.hecho).length, 0);
+    const hechas = e.notas.reduce((a, n) => a + n.items.filter((i) => i.hecho).length, 0);
+    const ayer = new Date(Date.parse(hoy + 'T12:00:00Z') - 864e5).toISOString().slice(0, 10);
+    const deCuando = forzado || !e.dia ? 'abiertos' : e.dia === ayer ? 'de ayer' : 'del ' + diaCorto(e.dia);
+
+    const terminar = (fn, aviso) => {
+      mutarNotas((x) => { if (fn) fn(x); x.dia = hoy; });
+      GM_setValue('postits:revision', null);
+      velo.remove(); modalDia = null;
+      if (aviso) toast(aviso, 'ok');
+    };
+    const aPapelera = (x, quedan) => {
+      const ahora = Date.now();
+      const van = x.notas.filter((n) => ids.includes(n.id) && !quedan(n));
+      x.notas = x.notas.filter((n) => !van.includes(n));
+      x.papelera.unshift(...van.map((n) => Object.assign(n, { borrada: ahora })));
+    };
+    // Quita las tareas hechas. Un post-it con todas sus tareas hechas y sin notas de contexto
+    // se va a la papelera; uno que nunca tuvo tareas (solo título o notas) se queda.
+    const soloPendiente = (x) => {
+      const teniaTareas = new Set(e.notas.filter((n) => n.items.length).map((n) => n.id));
+      for (const n of x.notas) if (ids.includes(n.id)) n.items = n.items.filter((i) => !i.hecho);
+      aPapelera(x, (n) => n.items.length > 0 || !!n.contexto || !teniaTareas.has(n.id));
+    };
+
+    const filas = h('div', { class: 'pm-lista' });
+    const pintarFilas = () => filas.replaceChildren(...e.notas.map((n) => {
+      const c = categoria(n.cat);
+      const hn = n.items.filter((i) => i.hecho).length;
+      return h('div', {
+        class: 'pm-nota' + (mantener.has(n.id) ? '' : ' fuera'),
+        on: { click: () => { if (mantener.has(n.id)) mantener.delete(n.id); else mantener.add(n.id); pintarFilas(); } },
+      },
+      h('span', { class: 'pt-check' + (mantener.has(n.id) ? ' on' : ''), style: '--c:' + c.color, role: 'checkbox', 'aria-checked': String(mantener.has(n.id)) }),
+      h('span', { class: 'pm-cat-dot', style: '--c:' + c.color }, c.nombre),
+      h('span', { class: 'pm-nt' }, tituloDe(n)),
+      h('span', { class: 'pm-np' }, n.items.length ? hn + '/' + n.items.length : '—'));
+    }));
+    pintarFilas();
+
+    const accion = (titulo, desc, fn, clase) => h('button', { class: clase || '', on: { click: fn } }, h('b', null, titulo), h('small', null, desc));
+    const caja = h('div', { class: 'pmodal', role: 'dialog', 'aria-label': 'Post-its del día anterior' },
+      h('header', null,
+        h('h2', null, 'Buen día. Hoy es ' + diaLargo(hoy) + '.'),
+        h('p', null, `Tienes ${e.notas.length} post-its ${deCuando}: ${pend} tareas pendientes y ${hechas} hechas. ¿Qué hacemos con ellos?`)),
+      h('div', { class: 'pm-acciones' },
+        accion('Mantener todos', 'Siguen igual, con lo hecho tachado', () => terminar(null, 'Post-its conservados.')),
+        accion('Solo lo pendiente', 'Quita las tareas hechas y los post-its terminados', () => terminar(soloPendiente, 'Listo: quedó solo lo pendiente.'), 'prim'),
+        accion('Borrar todos', 'Empiezas el día en blanco', () => terminar((x) => aPapelera(x, () => false), 'Post-its borrados. Se recuperan 7 días desde el menú de Tampermonkey.'))),
+      h('div', { class: 'pm-sub' }, 'O decide uno por uno: marca los que se quedan.'),
+      filas,
+      h('footer', null,
+        h('button', { on: { click: () => { GM_setValue('postits:pospuesto', Date.now() + 60 * 60e3); GM_setValue('postits:revision', null); velo.remove(); modalDia = null; } } }, 'Decidir en una hora'),
+        h('span', { class: 'pt-esp' }),
+        h('button', { class: 'prim', on: { click: () => terminar((x) => aPapelera(x, (n) => mantener.has(n.id)), `Quedan ${mantener.size} post-its.`) } }, 'Aplicar mi selección')));
+    const velo = h('div', { class: 'pvelo' }, caja);
+    modalDia = velo;
+    ui().appendChild(velo);
+  }
+
+  function iniciarPostits() {
+    GM_addValueChangeListener('postits', (_k, _v, _n, remoto) => {
+      if (!remoto) return;
+      pintarPostits();
+      if (tarjeta) {
+        if (!buscarNota(estadoNotas(), tarjeta.id)) { descartarPendientes(); tarjeta.nodo.remove(); tarjeta = null; pintarPostits(); }
+        else if (!enfocadoEn(tarjeta.nodo)) pintarTarjeta();
+      }
+      if (modalDia && estadoNotas().dia === hoyBogota()) { modalDia.remove(); modalDia = null; }
+    });
+    for (const k of ['postits:cats', 'postits:ui', 'cfg']) {
+      GM_addValueChangeListener(k, (_k, _v, _n, remoto) => {
+        if (!remoto) return;
+        pintarPostits();
+        if (tarjeta && !enfocadoEn(tarjeta.nodo)) pintarTarjeta();
+      });
+    }
+    window.addEventListener('resize', () => { pintarPostits(); ubicarTarjeta(); });
+    pintarPostits();
+    setTimeout(() => revisarDia(), 1200);
+    setInterval(() => { if (!document.hidden) revisarDia(); }, 5 * 60e3);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(() => revisarDia(), 600); });
+  }
 
   // ───────────────────────── Lupa ─────────────────────────
   // Amplía la página alrededor del cursor. Rueda: ampliar o reducir. Mover el mouse: recorrer.
@@ -1149,6 +1762,12 @@
     GM_registerMenuCommand('Recortar una zona', iniciarRecorte);
     GM_registerMenuCommand('Lupa (Alt+L)', () => iniciarLupa());
     const c = cfg();
+    GM_registerMenuCommand('Nuevo post-it', () => crearNota(''));
+    GM_registerMenuCommand((c.postits ? 'Ocultar' : 'Mostrar') + ' los post-its (Alt+N los pliega)', () => { setCfg({ postits: !cfg().postits }); if (!cfg().postits) cerrarTarjeta(); pintarPostits(); });
+    GM_registerMenuCommand('Revisar los post-its del día', () => revisarDia(true));
+    GM_registerMenuCommand('Categorías de post-its', editarCategorias);
+    const papelera = estadoNotas().papelera.filter((n) => n.borrada > Date.now() - PAPELERA_DIAS * 864e5).length;
+    if (papelera) GM_registerMenuCommand(`Recuperar post-its borrados (${papelera})`, recuperarNotas);
     if (c.hoja) GM_registerMenuCommand('Abrir la hoja de capturas', () => GM_openInTab(c.hoja, { active: true }));
     GM_registerMenuCommand(`Enviar pendientes (${GM_getValue('cola', []).length})`, () => vaciarCola(true));
     GM_registerMenuCommand('Desactivar en este sitio (' + HOST + ')', alternarSitio);
@@ -1174,6 +1793,7 @@
 
   if (cfg().resaltar) iniciarResaltado();
   iniciarPuente();
+  iniciarPostits();
 
   window.addEventListener('contextmenu', (e) => {
     if (!cfg().menuDerecho || e.defaultPrevented || esDeLaUI(e)) return; // el sitio tiene menú propio, o es nuestra UI
@@ -1186,6 +1806,7 @@
   document.addEventListener('click', (e) => {
     if (esDeLaUI(e)) return;
     cerrar();
+    if (tarjeta) cerrarTarjeta();
     if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
     if (e.target.closest && e.target.closest('a, button, input, textarea, select, label, [role=button], [contenteditable]:not([contenteditable="false"])')) return;
     if (getSelection().toString()) return;
@@ -1203,6 +1824,12 @@
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && abierto) { cerrar(); return; }
+    if (e.key === 'Escape' && tarjeta) { cerrarTarjeta(); return; }
+    if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyN') {
+      e.preventDefault(); e.stopPropagation();
+      plegarNotas();
+      return;
+    }
     if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyL') {
       e.preventDefault(); e.stopPropagation();
       if (lupa) salirLupa(); else iniciarLupa(ultimoPunto.x, ultimoPunto.y);

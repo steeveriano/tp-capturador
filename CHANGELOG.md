@@ -1,5 +1,18 @@
 # Cambios
 
+## 2.3.2 · 2026-10-29 04:14 (Bogotá)
+
+- **Post-its del día.** Pila flotante en el borde derecho de todas las páginas: post-its pequeños con categoría, título y avance; un clic abre la tarjeta con lista de tareas, notas de contexto, copiar y borrar. Se arrastran para cambiar de altura; **Alt+N** los pliega.
+- **Agregar post-it** en el clic derecho (con texto seleccionado) y botón *Post-it* en la barra al seleccionar: nuevo post-it con lo seleccionado, o como tarea de uno existente. La tarea guarda la página de origen, solo dominio y ruta.
+- **Siete categorías** (Urgente, Comercial, Operación, Desarrollo, Gestión, Personal, Ideas), filtro por color y editor de categorías.
+- **Día nuevo (hora de Bogotá):** pregunta una sola vez, en una sola pestaña: mantener todos, solo lo pendiente, borrar todos o elegir uno por uno; o decidir en una hora.
+- Papelera de 7 días con *Recuperar post-its borrados* en el menú de Tampermonkey.
+- Lo que se escribe en los campos del script ya no llega a los atajos de teclado de la página.
+- Pruebas: `tests/postits.mjs`, 47 casos con dos pestañas reales y memoria compartida; controles negativos sobre el aislamiento de teclas, «solo lo pendiente», el turno entre pestañas, el origen sin parámetros y la pregunta del mismo día.
+- Número de versión: es función nueva, pero sale como parche porque la **2.4.0 está reservada** para la entrega de captura de secretos que espera aceptación de la ACH (PR #1). Esa rama se rebasa sobre esta antes de fusionarse.
+
+Origen: chat https://claude.ai/chat/5658e950-6b45-4967-93af-7c220e4f7d88
+
 ## 2.3.1 · 2026-10-26 16:09 (Bogotá)
 
 - El historial guarda todo lo copiado, sin filtrar lo que parezca contraseña, y ya no muestra el aviso. Decisión de Steeve. El historial sigue local al perfil y se borra a las 24 h.
