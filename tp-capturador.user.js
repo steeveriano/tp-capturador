@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TP Capturador
 // @namespace    https://github.com/steeveriano/tp-capturador
-// @version      2.3.2
+// @version      2.3.3
 // @description  Contactos a Google Sheets, menú propio de clic derecho, historial del portapapeles, recorte de zonas, post-its del día y puente Hermes ⇄ ChatGPT.
 // @author       Steeve Riaño · tierraparaiso
 // @homepageURL  https://github.com/steeveriano/tp-capturador
@@ -21,9 +21,12 @@
 // @grant        GM_openInTab
 // @grant        GM_addValueChangeListener
 // @grant        GM_removeValueChangeListener
+// @grant        GM_deleteValue
+// @grant        GM_listValues
 // @connect      script.google.com
 // @connect      script.googleusercontent.com
 // @connect      tierraparaiso.net
+// @connect      *
 // ==/UserScript==
 
 /*
@@ -36,7 +39,7 @@
   'use strict';
   if (window.top !== window.self) return;
 
-  const VERSION = '2.3.2';
+  const VERSION = '2.3.3';
   const REPO = 'https://github.com/steeveriano/tp-capturador';
   const HOST = location.hostname;
 
@@ -126,6 +129,22 @@
     .puente.hermes { right: 24px; }
     .puente.chatgpt { right: 22px; bottom: 120px; }
 
+
+    /* ── Vista previa del portapapeles e imágenes ── */
+    .menu .prev:empty { display: none; }
+    .menu .pv-b, .panel .pv-b { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 9px; width: 100%; padding: 6px 10px; border-radius: 6px; color: #f9fafb; font-size: 12.5px; }
+    .menu .pv-b:hover, .panel .pv-b:hover { background: #1f2937; }
+    .pv-img { flex: none; width: 40px; height: 30px; object-fit: cover; border-radius: 4px; background: #fff; border: 1px solid #374151; }
+    .pv-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pv-t.tenue { color: #9ca3af; white-space: normal; padding: 6px 10px; font-size: 11.5px; }
+    .pv-et { flex: none; font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #111827; background: #93c5fd; border-radius: 4px; padding: 2px 5px; }
+    .pv-b .k { flex: none; color: #9ca3af; font-size: 11px; }
+    .menu .pv-pedir, .panel .pv-pedir { all: unset; cursor: pointer; display: block; margin: 2px 6px; padding: 6px 8px; border-radius: 6px; border: 1px dashed #4b5563; color: #93c5fd; font-size: 12px; }
+    .menu .pv-pedir:hover, .panel .pv-pedir:hover { background: #1f2937; }
+    .panel .windows { margin: 0 8px 6px; padding: 4px 0; border: 1px solid #374151; border-radius: 8px; }
+    .panel .item .img { display: block; max-width: 100%; max-height: 120px; border-radius: 6px; background: #fff; margin-bottom: 4px; }
+    .tmini { display: flex; align-items: center; gap: 10px; }
+    .tmini img { width: 56px; height: 42px; object-fit: cover; border-radius: 4px; background: #fff; }
     /* ── Post-its ── */
     .menu .punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 8px; vertical-align: 1px; }
     .pdock { position: fixed; right: 0; display: flex; align-items: flex-start; pointer-events: none; }
@@ -320,9 +339,9 @@
     if (elemento && elemento.matches && elemento.matches('input[type=password], [autocomplete="one-time-code"], [autocomplete="current-password"], [autocomplete="new-password"]')) return;
     if (c.omitirSecretos && pareceSecreto(texto)) return;
     const recortado = texto.length > 20000 ? texto.slice(0, 20000) : texto;
-    const lista = historial().filter((x) => x.texto !== recortado);
+    const lista = historial().filter((x) => x.tipo === 'imagen' || x.texto !== recortado);
     lista.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), t: Date.now(), texto: recortado, sitio: HOST, titulo: document.title.slice(0, 120), origen });
-    GM_setValue('historial', lista.slice(0, c.maxHistorial));
+    guardarHistorial(lista);
   }
 
   function copiar(texto, origen) {
@@ -424,11 +443,6 @@
     if (!document.execCommand('delete')) {
       if (esCampoTexto(el)) { el.setRangeText('', el.selectionStart, el.selectionEnd, 'end'); el.dispatchEvent(new Event('input', { bubbles: true })); }
     }
-  }
-
-  async function leerPortapapelesSistema() {
-    try { return await navigator.clipboard.readText(); }
-    catch (_) { toast('Chrome no dejó leer el portapapeles en este sitio. Usa el historial o Ctrl+V.', 'aviso'); return null; }
   }
 
   // ───────────────────────── Detección de contactos ─────────────────────────
@@ -691,14 +705,12 @@
       items.push(sep());
     }
 
-    if (destino.editable) {
-      const ultimo = historial()[0];
-      items.push(seccion('Pegar'));
-      if (ultimo) items.push(boton('Pegar lo último copiado', () => pegarEn(destino, ultimo.texto), 'historial'));
-      items.push(boton('Pegar del portapapeles de Windows', async () => { const t = await leerPortapapelesSistema(); if (t) pegarEn(destino, t); }, 'Ctrl+V'));
-      items.push(boton('Pegar desde el historial…', () => abrirHistorial(destino), 'Alt+V'));
-      items.push(sep());
-    }
+    // Lo que hay en Windows ahora y las últimas copias, con vista previa. Clic: pega (en un campo) o copia.
+    items.push(seccion(destino.editable ? 'Pegar' : 'Portapapeles'));
+    items.push(filaWindows(destino, cerrar));
+    for (const it of historial().slice(0, 3)) items.push(filaPrevia(it, destino, cerrar));
+    items.push(boton(destino.editable ? 'Pegar desde el historial…' : 'Todo el historial del portapapeles…', () => abrirHistorial(destino.editable ? destino : null), 'Alt+V'));
+    items.push(sep());
 
     if (enlace && !contacto) {
       items.push(seccion('Enlace'));
@@ -708,6 +720,7 @@
     }
     if (imagen) {
       items.push(seccion('Imagen'));
+      items.push(boton('Copiar imagen', () => copiarImagenDePagina(imagen)));
       items.push(boton('Copiar dirección de la imagen', () => copiar(imagen.currentSrc || imagen.src)));
       items.push(sep());
     }
@@ -721,7 +734,6 @@
     items.push(seccion('Página'));
     items.push(boton('Recortar una zona…', iniciarRecorte));
     items.push(boton('Lupa (rueda para ampliar)', () => iniciarLupa(x, y), 'Alt+L'));
-    if (!destino.editable) items.push(boton('Historial del portapapeles', () => abrirHistorial(null), 'Alt+V'));
     items.push(boton('Nuevo post-it', () => crearNota('')));
     items.push(boton('Copiar título y dirección', () => copiar(document.title + '\n' + location.href)));
     items.push(boton('Guardar esta página en la hoja', () => guardar({ tipo: 'pagina', valor: location.origin + location.pathname, nota: document.title })));
@@ -780,14 +792,13 @@
     let marcado = 0;
     const panel = h('div', { class: 'panel' },
       h('header', null, h('span', null, destino && destino.editable ? 'Pegar desde el historial' : 'Historial del portapapeles'), boton('Cerrar', () => {})),
-      buscar, lista,
-      h('footer', null, h('span', null, `Se guarda ${cfg().retencionHoras} h, solo en este perfil`), h('button', { on: { click: () => { if (confirm('¿Borrar todo el historial de este perfil?')) { GM_setValue('historial', []); pintar(); } } } }, 'Borrar todo')));
+      buscar, filaWindows(destino, () => panel.remove()), lista,
+      h('footer', null, h('span', null, `Se guarda ${cfg().retencionHoras} h, solo en este perfil`), h('button', { on: { click: () => { if (confirm('¿Borrar todo el historial de este perfil?')) { guardarHistorial([]); pintar(); } } } }, 'Borrar todo')));
     panel.querySelector('header button').addEventListener('click', () => panel.remove());
 
     function usar(it) {
       panel.remove();
-      if (destino && destino.editable) pegarEn(destino, it.texto);
-      else { copiar(it.texto, 'historial'); toast('Copiado. Pégalo con Ctrl+V o clic derecho.', 'ok'); }
+      usarDelHistorial(it, destino);
     }
 
     function pintar() {
@@ -796,13 +807,15 @@
       if (!items.length) { lista.append(h('div', { class: 'vacio' }, filtro ? 'Nada coincide.' : 'Todavía no has copiado nada en este perfil.')); return; }
       marcado = Math.min(marcado, items.length - 1);
       items.forEach((it, i) => {
+        const imagen = it.tipo === 'imagen';
         const fila = h('div', { class: 'item' + (i === marcado ? ' sel' : '') },
+          imagen ? h('img', { class: 'img', src: it.mini, alt: '' }) : null,
           h('div', { class: 't' }, it.texto.length > 400 ? it.texto.slice(0, 400) + '…' : it.texto),
-          h('div', { class: 'm' }, h('span', null, it.sitio), h('span', null, hace(it.t))),
+          h('div', { class: 'm' }, h('span', null, it.origen === 'windows' ? 'Windows' : it.sitio), h('span', null, hace(it.t))),
           h('div', { class: 'acc' },
-            h('button', { on: { click: (e) => { e.stopPropagation(); copiar(it.texto, 'historial'); toast('Copiado.', 'ok'); } } }, 'Copiar'),
-            h('button', { on: { click: (e) => { e.stopPropagation(); guardar({ tipo: 'texto', valor: it.texto, nota: 'desde historial · ' + it.sitio }); } } }, 'A la hoja'),
-            h('button', { on: { click: (e) => { e.stopPropagation(); GM_setValue('historial', historial().filter((x) => x.id !== it.id)); pintar(); } } }, 'Borrar')));
+            h('button', { on: { click: (e) => { e.stopPropagation(); if (imagen) copiarImagen(() => imagenDeHistorial(it), { src: it.src, origen: 'historial' }); else { copiar(it.texto, 'historial'); toast('Copiado.', 'ok'); } } } }, 'Copiar'),
+            imagen ? null : h('button', { on: { click: (e) => { e.stopPropagation(); guardar({ tipo: 'texto', valor: it.texto, nota: 'desde historial · ' + it.sitio }); } } }, 'A la hoja'),
+            h('button', { on: { click: (e) => { e.stopPropagation(); guardarHistorial(historial().filter((x) => x.id !== it.id)); pintar(); } } }, 'Borrar')));
         fila.addEventListener('click', () => usar(it));
         lista.append(fila);
       });
@@ -1313,6 +1326,238 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(() => revisarDia(), 600); });
   }
 
+  // ───────────────────────── Imágenes y portapapeles de Windows ─────────────────────────
+  // Copiar imágenes de cualquier página, guardarlas en el historial con miniatura y ver qué hay
+  // ahora mismo en el portapapeles de Windows (Chrome pide permiso una vez por sitio).
+  const MAX_IMAGENES = 8;           // imágenes completas que guarda el historial; las demás quedan en miniatura
+  const MAX_BYTES_IMAGEN = 1.5e6;   // más grandes que esto quedan solo en miniatura (y su dirección)
+  const idNuevo = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const esWeb = (u) => /^https?:\/\//i.test(u || '');
+
+  function blobADataUrl(b) {
+    return new Promise((ok, mal) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = mal; r.readAsDataURL(b); });
+  }
+  // Huella por píxeles, no por bytes: Windows y Chrome vuelven a codificar la imagen al copiarla,
+  // y la misma imagen tiene que reconocerse como la misma.
+  async function huella(b) {
+    const m = await aMapa(b);
+    const w = m.width || m.naturalWidth, hh = m.height || m.naturalHeight;
+    const px = lienzoDe(m, 24, 24).getContext('2d').getImageData(0, 0, 24, 24).data;
+    const d = await crypto.subtle.digest('SHA-256', px.map((v) => v >> 3));
+    return w + 'x' + hh + ':' + [...new Uint8Array(d)].slice(0, 10).map((x) => x.toString(16).padStart(2, '0')).join('');
+  }
+  async function aMapa(blob) {
+    try { return await createImageBitmap(blob); } catch (_) { /* SVG y otros: se dibujan con <img> */ }
+    const url = URL.createObjectURL(blob);
+    try {
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      return img;
+    } finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
+  }
+  function lienzoDe(fuente, ancho, alto) {
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(ancho)); c.height = Math.max(1, Math.round(alto));
+    c.getContext('2d').drawImage(fuente, 0, 0, c.width, c.height);
+    return c;
+  }
+  const lienzoABlob = (c, tipo, calidad) => new Promise((ok, mal) => c.toBlob((b) => (b ? ok(b) : mal(new Error('sin imagen'))), tipo, calidad));
+  async function aPng(blob) {
+    if (blob.type === 'image/png') return blob;
+    const m = await aMapa(blob);
+    return lienzoABlob(lienzoDe(m, m.width || m.naturalWidth, m.height || m.naturalHeight), 'image/png');
+  }
+  async function miniatura(blob) {
+    const m = await aMapa(blob);
+    const w = m.width || m.naturalWidth, hh = m.height || m.naturalHeight;
+    const f = Math.min(1, 240 / Math.max(w, hh));
+    return { mini: await blobADataUrl(await lienzoABlob(lienzoDe(m, w * f, hh * f), 'image/webp', 0.82)), ancho: w, alto: hh };
+  }
+
+  // La imagen ya está cargada en la página: si es del mismo sitio (o permite CORS) se dibuja directo.
+  async function blobDeImgCargada(img) {
+    if (!img || !img.complete || !img.naturalWidth) return null;
+    try { return await lienzoABlob(lienzoDe(img, img.naturalWidth, img.naturalHeight), 'image/png'); } catch (_) { return null; }
+  }
+  // Si no, se descarga: primero como la página; si el sitio no lo permite, por Tampermonkey.
+  function bajarImagen(src) {
+    if (/^(data|blob):/i.test(src)) return fetch(src).then((r) => r.blob());
+    return fetch(src, { credentials: 'include' }).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+      .catch(() => new Promise((ok, mal) => GM_xmlhttpRequest({
+        method: 'GET', url: src, responseType: 'blob', timeout: 20000,
+        onload: (r) => (r.status >= 200 && r.status < 400 && r.response ? ok(r.response) : mal(new Error('HTTP ' + r.status))),
+        onerror: () => mal(new Error('sin conexión')), ontimeout: () => mal(new Error('tardó demasiado')),
+      })));
+  }
+
+  function guardarHistorial(lista) {
+    const c = cfg();
+    lista = lista.slice(0, c.maxHistorial);
+    // Solo las últimas imágenes conservan el archivo completo; las demás quedan en miniatura.
+    let completas = 0;
+    for (const x of lista) {
+      if (x.tipo !== 'imagen' || !x.completa) continue;
+      if (++completas > MAX_IMAGENES) { x.completa = false; GM_deleteValue('img:' + x.id); }
+    }
+    GM_setValue('historial', lista);
+    // Archivos de imágenes que ya salieron del historial (vencidas o borradas).
+    const vivas = new Set(lista.filter((x) => x.completa).map((x) => 'img:' + x.id));
+    for (const k of GM_listValues()) if (k.startsWith('img:') && !vivas.has(k)) GM_deleteValue(k);
+  }
+
+  async function registrarImagen(png, datos) {
+    const marca = await huella(png);
+    const previa = historial().find((x) => x.tipo === 'imagen' && x.huella === marca);
+    if (previa) {
+      guardarHistorial([Object.assign(previa, { t: Date.now(), origen: datos.origen || previa.origen })].concat(historial().filter((x) => x.id !== previa.id)));
+      return previa;
+    }
+    const { mini, ancho, alto } = await miniatura(png);
+    const id = idNuevo();
+    const completa = png.size <= MAX_BYTES_IMAGEN;
+    if (completa) GM_setValue('img:' + id, await blobADataUrl(png));
+    const it = {
+      id, t: Date.now(), tipo: 'imagen', huella: marca, mini, ancho, alto, completa,
+      src: esWeb(datos.src) ? datos.src.slice(0, 2000) : '',
+      texto: (datos.alt ? corto(datos.alt, 80) + ' · ' : '') + `Imagen ${ancho}×${alto}`,
+      sitio: HOST, titulo: document.title.slice(0, 120), origen: datos.origen || 'menú',
+    };
+    guardarHistorial([it].concat(historial()));
+    return it;
+  }
+
+  async function imagenDeHistorial(it) {
+    const d = GM_getValue('img:' + it.id, null);
+    if (d) return (await fetch(d)).blob();
+    if (it.src) { try { return await aPng(await bajarImagen(it.src)); } catch (_) { /* sigue con la miniatura */ } }
+    return aPng(await (await fetch(it.mini)).blob());
+  }
+
+  const avisoImagen = (mini, msg) => h('span', { class: 'tmini' }, mini ? h('img', { src: mini, alt: '' }) : null, msg);
+
+  // Copia una imagen al portapapeles. La escritura se pide en el mismo clic (Chrome lo exige) y la
+  // imagen se resuelve mientras tanto.
+  async function copiarImagen(obtener, datos) {
+    const promesa = obtener().then(aPng);
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': promesa })]);
+    } catch (e) {
+      toast('No pude copiar esa imagen (' + corto(e && e.message, 70) + '). Clic derecho otra vez para usar el menú de Chrome.', 'error');
+      return null;
+    }
+    const it = await registrarImagen(await promesa, datos);
+    toast(avisoImagen(it.mini, 'Imagen copiada. Pégala con Ctrl+V.'), 'ok');
+    return it;
+  }
+  const copiarImagenDePagina = (img) => {
+    const src = img.currentSrc || img.src;
+    return copiarImagen(async () => (await blobDeImgCargada(img)) || bajarImagen(src), { src, alt: img.alt, origen: 'menú' });
+  };
+
+  // Pega una imagen en un campo: los editores que aceptan imágenes (ChatGPT, Gmail, WhatsApp Web…)
+  // la reciben como un Ctrl+V. Si el campo no la acepta, queda copiada para pegarla a mano.
+  async function pegarImagenEn(destino, it) {
+    const png = await imagenDeHistorial(it);
+    const el = destino && destino.editable;
+    if (el && el.isConnected) {
+      el.focus();
+      if (destino.rango) { const s = getSelection(); s.removeAllRanges(); s.addRange(destino.rango); }
+      const dt = new DataTransfer();
+      dt.items.add(new File([png], 'imagen.png', { type: 'image/png' }));
+      const ev = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true, composed: true });
+      el.dispatchEvent(ev);
+      if (ev.defaultPrevented) { guardarHistorial([Object.assign(it, { t: Date.now() })].concat(historial().filter((x) => x.id !== it.id))); return; }
+    }
+    await copiarImagen(async () => png, { src: it.src, origen: 'historial' });
+    toast('Este campo no recibe imágenes pegadas desde el script: quedó copiada, pulsa Ctrl+V.', 'aviso');
+  }
+
+  function usarDelHistorial(it, destino) {
+    if (it.tipo === 'imagen') {
+      if (destino && destino.editable) return pegarImagenEn(destino, it);
+      return copiarImagen(() => imagenDeHistorial(it), { src: it.src, origen: 'historial' });
+    }
+    if (destino && destino.editable) return pegarEn(destino, it.texto);
+    copiar(it.texto, 'historial');
+    toast('Copiado. Pégalo con Ctrl+V o clic derecho.', 'ok');
+  }
+
+  // ── Portapapeles de Windows ──
+  async function permisoPortapapeles() {
+    try { return (await navigator.permissions.query({ name: 'clipboard-read' })).state; } catch (_) { return 'prompt'; }
+  }
+  // Lee lo que hay ahora en Windows y lo suma al historial. Devuelve { tipo, texto | it }.
+  async function leerWindows() {
+    const items = await navigator.clipboard.read();
+    for (const i of items) {
+      const tipo = i.types.find((t) => t.startsWith('image/'));
+      if (tipo) {
+        const png = await aPng(await i.getType(tipo));
+        return { tipo: 'imagen', it: await registrarImagen(png, { origen: 'windows' }) };
+      }
+    }
+    for (const i of items) {
+      if (i.types.includes('text/plain')) {
+        const texto = await (await i.getType('text/plain')).text();
+        if (texto.trim()) { registrar(texto, 'windows'); return { tipo: 'texto', texto }; }
+      }
+    }
+    return { tipo: 'vacio' };
+  }
+
+  // Fila «Windows ahora» para el menú y el panel. Se llena sola si Chrome ya dio permiso;
+  // si no, un clic pide el permiso. No cierra el menú.
+  function filaWindows(destino, alUsar) {
+    const fila = h('div', { class: 'prev windows' });
+    const pintar = (r) => {
+      fila.replaceChildren();
+      if (!r) return;
+      if (r.error) { fila.append(h('span', { class: 'pv-t tenue' }, r.error)); return; }
+      if (r.pedir) {
+        fila.append(h('button', { class: 'pv-pedir', on: { click: (ev) => { ev.stopPropagation(); leer(true); } } }, 'Ver qué hay en el portapapeles de Windows'));
+        return;
+      }
+      if (r.tipo === 'vacio') { fila.append(h('span', { class: 'pv-et' }, 'Windows'), h('span', { class: 'pv-t tenue' }, 'vacío o con algo que Chrome no lee')); return; }
+      const contenido = r.tipo === 'imagen'
+        ? [h('img', { class: 'pv-img', src: r.it.mini, alt: '' }), h('span', { class: 'pv-t' }, r.it.texto)]
+        : [h('span', { class: 'pv-t' }, corto(r.texto, 90))];
+      const b = h('button', {
+        class: 'pv-b', title: destino && destino.editable ? 'Pegar aquí' : 'Ya está en el portapapeles: pégalo con Ctrl+V',
+        on: { click: (ev) => {
+          ev.stopPropagation();
+          if (alUsar) alUsar();
+          if (destino && destino.editable) {
+            if (r.tipo === 'imagen') pegarImagenEn(destino, r.it); else pegarEn(destino, r.texto);
+          } else toast('Eso ya está en el portapapeles de Windows: pégalo con Ctrl+V.', 'ok');
+        } },
+      }, h('span', { class: 'pv-et' }, 'Windows'), contenido, h('span', { class: 'k' }, destino && destino.editable ? 'pegar' : 'ahora'));
+      fila.append(b);
+    };
+    const leer = async (pedido) => {
+      pintar({ error: 'Leyendo el portapapeles de Windows…' });
+      try { pintar(await leerWindows()); }
+      catch (_) { pintar({ error: pedido ? 'Chrome no dio permiso para leer el portapapeles en este sitio.' : 'No se pudo leer el portapapeles de Windows.' }); }
+    };
+    permisoPortapapeles().then((p) => {
+      if (p === 'granted') leer(false);
+      else if (p === 'denied') pintar({ error: 'Chrome tiene bloqueado leer el portapapeles en este sitio (candado de la barra de direcciones).' });
+      else pintar({ pedir: true });
+    });
+    return fila;
+  }
+
+  // Vista previa compacta de una copia del historial (texto o imagen).
+  function filaPrevia(it, destino, alUsar) {
+    return h('button', {
+      class: 'pv-b',
+      on: { click: (ev) => { ev.stopPropagation(); if (alUsar) alUsar(); usarDelHistorial(it, destino); } },
+    },
+    it.tipo === 'imagen' ? h('img', { class: 'pv-img', src: it.mini, alt: '' }) : null,
+    h('span', { class: 'pv-t' }, it.tipo === 'imagen' ? it.texto : corto(it.texto, 90)),
+    h('span', { class: 'k' }, hace(it.t)));
+  }
+
   // ───────────────────────── Lupa ─────────────────────────
   // Amplía la página alrededor del cursor. Rueda: ampliar o reducir. Mover el mouse: recorrer.
   // Esc, clic derecho o reducir hasta 1× para salir. Los clics siguen funcionando con la lupa puesta.
@@ -1444,8 +1689,7 @@
       h('div', { class: 'cuerpo' }, url ? h('img', { src: url, alt: 'Recorte' }) : null, area),
       h('div', { class: 'acciones' },
         blob ? h('button', { on: { click: async () => {
-          try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); toast('Imagen copiada. Pégala con Ctrl+V en WhatsApp, correo o documentos.', 'ok'); }
-          catch (_) { toast('Chrome no dejó copiar la imagen aquí. Usa Descargar.', 'aviso'); }
+          await copiarImagen(async () => blob, { origen: 'recorte' });
         } } }, 'Copiar imagen') : null,
         texto ? h('button', { on: { click: () => { copiar(texto, 'recorte'); toast('Texto copiado.', 'ok'); } } }, 'Copiar texto') : null,
         blob ? h('button', { on: { click: () => {

@@ -57,6 +57,8 @@ const SHIM = (mem) => `
     window.GM_setValue = (k, v) => { mem[k] = JSON.parse(JSON.stringify(v)); window.__gmSet(k, mem[k]); };
     window.GM_addValueChangeListener = () => 0;
     window.GM_removeValueChangeListener = () => {};
+    window.GM_listValues = () => Object.keys(mem);
+    window.GM_deleteValue = (k) => { delete mem[k]; window.__gmSet(k, undefined); };
     window.GM_setClipboard = (t) => { window.__clip = t; };
     window.GM_registerMenuCommand = (n) => { (window.__menu = window.__menu || []).push(n); };
     window.GM_addStyle = (c) => { const s = document.createElement('style'); s.textContent = c; document.head.appendChild(s); };
@@ -128,7 +130,7 @@ ok((await pagina.evaluate(() => GM_getValue('historial', [])[0]?.texto)) === 'Te
 await pagina.click('#campo');
 await pagina.click('#campo', { button: 'right' });
 await pagina.waitForTimeout(100);
-await clicEnSombra('Pegar lo último copiado');
+await clicEnSombra('Texto para recortar'); // vista previa de la última copia en el clic derecho
 ok((await pagina.inputValue('#campo')) === 'Texto para recortar', 'pegar desde el menú escribe en el campo');
 
 // 7. Segundo clic derecho deja pasar el menú de Chrome; Ctrl+clic derecho también

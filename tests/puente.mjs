@@ -82,6 +82,8 @@ const SHIM = (mem) => `
     window.GM_setValue = (k, v) => { const viejo = mem[k]; mem[k] = JSON.parse(JSON.stringify(v)); window.__gmSet(k, mem[k]); avisar(k, viejo, mem[k], false); };
     window.GM_addValueChangeListener = (k, cb) => { n++; oyentes[n] = { k, cb }; return n; };
     window.GM_removeValueChangeListener = (id) => { delete oyentes[id]; };
+    window.GM_listValues = () => Object.keys(mem);
+    window.GM_deleteValue = (k) => { delete mem[k]; window.__gmSet(k, undefined); };
     window.GM_setClipboard = (t) => { window.__clip = t; };
     window.GM_registerMenuCommand = (t) => { (window.__menu = window.__menu || []).push(t); };
     window.GM_addStyle = (c) => { const s = document.createElement('style'); s.textContent = c; document.head.appendChild(s); };

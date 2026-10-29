@@ -1,5 +1,16 @@
 # Cambios
 
+## 2.3.3 · 2026-10-29 05:13 (Bogotá)
+
+- **Copiar imagen** en el clic derecho sobre una imagen. Antes el menú propio solo ofrecía copiar su dirección y tapaba el «Copiar imagen» de Chrome. Las imágenes de otros sitios se descargan por Tampermonkey (`@connect *`).
+- **Vista previa del portapapeles** en el clic derecho: lo que hay ahora en Windows (texto o imagen, con miniatura) y las últimas tres copias. Un clic pega en el campo o vuelve a copiar. Chrome pide permiso de lectura una vez por sitio.
+- El **historial guarda imágenes** con miniatura (copiadas, recortadas o leídas de Windows). Las últimas 8 conservan el archivo completo. Se reconocen por sus píxeles, así que la misma imagen no se duplica aunque Windows la vuelva a codificar.
+- Pegar una imagen del historial en editores que aceptan imágenes (ChatGPT, Gmail, WhatsApp Web) como un Ctrl+V; en los demás campos queda copiada.
+- Pruebas: `tests/imagenes.mjs`, 24 casos sobre el portapapeles real de Chromium, con imagen del mismo sitio y de otro que no deja descargarla; controles negativos sobre la descarga por Tampermonkey, la huella por píxeles, el límite de imágenes y el pegado.
+- Sigue en 2.3.x porque la 2.4.0 está reservada para la entrega en revisión de la ACH (PR #1).
+
+Origen: chat https://claude.ai/chat/5658e950-6b45-4967-93af-7c220e4f7d88
+
 ## 2.3.2 · 2026-10-29 04:14 (Bogotá)
 
 - **Post-its del día.** Pila flotante en el borde derecho de todas las páginas: post-its pequeños con categoría, título y avance; un clic abre la tarjeta con lista de tareas, notas de contexto, copiar y borrar. Se arrastran para cambiar de altura; **Alt+N** los pliega.

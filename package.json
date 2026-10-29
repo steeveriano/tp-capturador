@@ -1,12 +1,12 @@
 {
   "name": "tp-capturador",
-  "version": "2.3.2",
+  "version": "2.3.3",
   "private": true,
   "description": "Userscript de Tampermonkey: contactos a Google Sheets, menú de clic derecho, historial del portapapeles y recorte.",
   "type": "module",
   "scripts": {
     "check": "node --check tp-capturador.user.js",
-    "test": "node --check tp-capturador.user.js && node tests/prueba.mjs && node tests/puente.mjs && node tests/postits.mjs"
+    "test": "node --check tp-capturador.user.js && node tests/prueba.mjs && node tests/puente.mjs && node tests/postits.mjs && node tests/imagenes.mjs"
   },
   "devDependencies": {
     "html2canvas": "1.4.1",

@@ -46,6 +46,8 @@ const SHIM = (mem) => `
     window.GM_setValue = (k, v) => { const viejo = mem[k]; mem[k] = v === undefined ? null : JSON.parse(JSON.stringify(v)); window.__gmSet(k, mem[k]); avisar(k, viejo, mem[k], false); };
     window.GM_addValueChangeListener = (k, cb) => { n++; oyentes[n] = { k, cb }; return n; };
     window.GM_removeValueChangeListener = (id) => { delete oyentes[id]; };
+    window.GM_listValues = () => Object.keys(mem);
+    window.GM_deleteValue = (k) => { delete mem[k]; window.__gmSet(k, undefined); };
     window.GM_setClipboard = (t) => { window.__clip = t; };
     window.GM_registerMenuCommand = (t, fn) => { (window.__menu = window.__menu || []).push(t); (window.__menuFn = window.__menuFn || {})[t] = fn; };
     window.GM_addStyle = () => {};

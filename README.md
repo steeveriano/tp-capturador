@@ -6,7 +6,9 @@ Herramienta personal para Chrome, sobre Tampermonkey. Funciona en todos los siti
 - **Clic derecho propio:** copiar, cortar, pegar lo último, pegar del historial, recortar, guardar en la hoja. Un segundo clic derecho (o Ctrl+clic derecho) abre el menú normal de Chrome. Los sitios con menú propio, como Google Docs o Maps, conservan el suyo.
 - **Barra al seleccionar texto:** Copiar · Cortar · Guardar · WhatsApp · Buscar · Post-it · Recortar.
 - **Post-its del día:** notas flotantes con lista de tareas y categoría, pegadas al borde derecho de todas las páginas. Selecciona un texto › clic derecho › *Agregar post-it…*. Cada día nuevo pregunta qué hacer con los del día anterior. **Alt+N** los pliega.
-- **Historial del portapapeles:** guarda todo lo que copias durante 24 horas, solo en ese perfil de Chrome. Se abre con **Alt+V**.
+- **Historial del portapapeles:** guarda todo lo que copias durante 24 horas, solo en ese perfil de Chrome, **también imágenes** con miniatura. Se abre con **Alt+V**.
+- **Vista previa en el clic derecho:** la sección *Portapapeles* (o *Pegar*, dentro de un campo) muestra lo que hay ahora en el portapapeles de **Windows** y tus últimas tres copias, con miniatura si son imágenes. Un clic pega en el campo o vuelve a copiar.
+- **Copiar imagen:** clic derecho sobre cualquier imagen › *Copiar imagen*. Funciona también con imágenes de otros sitios.
 - **Puente Hermes ⇄ ChatGPT:** en Hermes (`hermes*.tierraparaiso.net`) y en ChatGPT aparece el botón naranja **Pasar a…**. Muestra las conversaciones de Hermes y ChatGPT abiertas en el perfil y tú eliges a cuál va. **Alt+P** envía directo a la emparejada. Toma la última respuesta, o lo que tengas seleccionado, y lo pega en la caja de la conversación elegida. **No envía**: tú revisas y pulsas Enter.
 - **Lupa:** clic derecho › *Lupa* (o **Alt+L**). La página se amplía alrededor del cursor; la rueda del mouse amplía o reduce (de 1× a 8×) y al mover el mouse recorres la página. Los clics siguen funcionando. **Esc** o clic derecho para salir. Para ver nítido algo que vas a leer largo rato, Ctrl + rueda (zoom propio de Chrome) se ve más definido.
 - **Recortar una zona:** arrastras un recuadro y obtienes la imagen y el texto de esa parte de la página.
@@ -46,6 +48,13 @@ Si hay un script viejo "Sales TierraParaíso — Capturador de Contactos", **hay
 - **Papelera:** lo borrado se recupera durante 7 días desde el menú de Tampermonkey › *Recuperar post-its borrados*.
 - Lo que escribes en un post-it no dispara los atajos de teclado de la página (Gmail, GitHub, etc.).
 
+## Imágenes y portapapeles de Windows
+
+- **Copiar imagen** copia el archivo de verdad (PNG), listo para Ctrl+V en WhatsApp, correo, ChatGPT o documentos. Si la imagen es de otro sitio, el script la descarga por Tampermonkey. La primera vez en cada sitio Tampermonkey puede preguntar si permite la conexión: elige *Permitir siempre* (o *Permitir todos los dominios*).
+- **Windows ahora:** el clic derecho y el historial muestran lo que hay en el portapapeles de Windows, aunque lo hayas copiado en otra aplicación. Chrome pide permiso **una vez por sitio** («ver texto e imágenes copiados»); hasta que lo des, aparece el botón *Ver qué hay en el portapapeles de Windows*. Lo que se lee de Windows entra al historial.
+- **Pegar una imagen del historial** en un campo: los editores que aceptan imágenes (ChatGPT, Gmail, WhatsApp Web) la reciben como un Ctrl+V. Si el campo no las acepta, queda copiada y avisa que pulses Ctrl+V.
+- Las últimas **8 imágenes** guardan el archivo completo; las anteriores quedan en miniatura y, si tienen dirección web, se vuelven a descargar al copiarlas.
+
 ## Pedir un cambio
 
 En el clic derecho o en el menú de Tampermonkey está **Pedir un cambio a Claude Code**. Abre una solicitud (issue) en este repositorio con el sitio y la versión ya escritos. Claude Code la toma, cambia el código, prueba y publica. Tu navegador recibe la actualización sola.
@@ -55,7 +64,7 @@ En el clic derecho o en el menú de Tampermonkey está **Pedir un cambio a Claud
 | Dato | Dónde queda |
 |---|---|
 | Contactos, textos y recortes que guardas | Hoja de Google *TP Capturador · Capturas* |
-| Historial del portapapeles | Solo en ese perfil de Chrome, 24 h. Nunca sale del navegador |
+| Historial del portapapeles (texto e imágenes) | Solo en ese perfil de Chrome, 24 h. Nunca sale del navegador. Borrar el historial borra también las imágenes |
 | Post-its | Solo en ese perfil de Chrome, en todas sus pestañas. Nunca salen del navegador. La papelera guarda 7 días |
 | Dirección de la hoja y clave | Almacenamiento de Tampermonkey del perfil. **Nunca en este repositorio** |
 
@@ -66,8 +75,8 @@ De la página de origen solo se envía el dominio y la ruta, sin parámetros, pa
 - La imagen del recorte se arma redibujando la página: videos, mapas y algunas imágenes de otros sitios salen en blanco. El texto sí sale.
 - Los post-its son **por perfil de Chrome**: los de «Steeve personal» no se ven en otro perfil.
 - No corre en `chrome://`, en la Chrome Web Store ni en el visor de PDF de Chrome: Chrome no lo permite.
-- El historial solo ve lo que se copia en páginas web. Para lo copiado en otras aplicaciones de Windows está **Win+V**.
-- Pegar desde el *portapapeles de Windows* pide permiso a Chrome la primera vez en cada sitio. Pegar desde el historial no lo pide.
+- Lo copiado en otras aplicaciones de Windows entra al historial cuando el script lee el portapapeles (al abrir el clic derecho o el historial), no en el momento de copiarlo. Solo se ve lo último que hay en Windows; para su historial completo está **Win+V**.
+- Leer el portapapeles de Windows pide permiso a Chrome la primera vez en cada sitio. Si lo bloqueaste, se reactiva en el candado de la barra de direcciones.
 
 ## Estructura
 
