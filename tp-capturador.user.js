@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TP Capturador
 // @namespace    https://github.com/steeveriano/tp-capturador
-// @version      2.3.3
+// @version      2.3.4
 // @description  Contactos a Google Sheets, menú propio de clic derecho, historial del portapapeles, recorte de zonas, post-its del día y puente Hermes ⇄ ChatGPT.
 // @author       Steeve Riaño · tierraparaiso
 // @homepageURL  https://github.com/steeveriano/tp-capturador
@@ -39,7 +39,7 @@
   'use strict';
   if (window.top !== window.self) return;
 
-  const VERSION = '2.3.3';
+  const VERSION = '2.3.4';
   const REPO = 'https://github.com/steeveriano/tp-capturador';
   const HOST = location.hostname;
 
@@ -158,9 +158,12 @@
     .ptab b { background: #f59e0b; color: #111827; border-radius: 999px; padding: 4px 2px; min-height: 12px; text-align: center; font-size: 10px; letter-spacing: 0; }
     .phead { background: #111827; color: #d1d5db; border: 1px solid #374151; border-radius: 9px; padding: 7px 8px; display: flex; flex-direction: column; gap: 7px;
       font-size: 11px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
-    .phead .fila { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+    .phead .fila { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; }
     .phead b { color: #f9fafb; font-size: 12px; }
     .phead .pres { color: #9ca3af; font-size: 10.5px; margin-top: -4px; }
+    .pbotones { display: flex; gap: 4px; }
+    .panclar { all: unset; cursor: pointer; white-space: nowrap; padding: 3px 8px; border-radius: 6px; background: #1d4ed8; color: #fff; font-size: 11px; font-weight: 600; }
+    .panclar:hover { background: #2563eb; }
     .pnuevo { all: unset; cursor: pointer; white-space: nowrap; padding: 3px 8px; border-radius: 6px; background: #b45309; color: #fff; font-size: 11px; font-weight: 600; }
     .pnuevo:hover { background: #d97706; }
     .pfiltros { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
@@ -283,8 +286,15 @@
         });
       }
     }
-    (document.body || document.documentElement).appendChild(raiz);
+    // Va en <html>, no en <body>: las apps de una sola página reemplazan el body y la borraban.
+    document.documentElement.appendChild(raiz);
     return sombra;
+  }
+  // Si la página la quita igual, se repone sola.
+  function vigilarRaiz() {
+    const reponer = () => { if (raiz && !raiz.isConnected && document.documentElement) document.documentElement.appendChild(raiz); };
+    new MutationObserver(reponer).observe(document.documentElement, { childList: true });
+    setInterval(reponer, 1500);
   }
   const esDeLaUI = (e) => !!raiz && e.composedPath().includes(raiz);
 
@@ -700,6 +710,7 @@
       items.push(boton('Copiar', () => copiar(sel), 'Ctrl+C'));
       if (destino.editable) items.push(boton('Cortar', () => cortarEn(destino), 'Ctrl+X'));
       items.push(boton('Guardar en la hoja', () => guardar({ tipo: 'texto', valor: sel })));
+      items.push(boton('Anclar en un post-it', anclar, 'Alt+K'));
       items.push(boton('Agregar post-it…', () => menuPostit(sel.trim(), x, y)));
       items.push(boton('Buscar en Google', () => GM_openInTab('https://www.google.com/search?q=' + encodeURIComponent(sel.slice(0, 300)), { active: true })));
       items.push(sep());
@@ -734,6 +745,7 @@
     items.push(seccion('Página'));
     items.push(boton('Recortar una zona…', iniciarRecorte));
     items.push(boton('Lupa (rueda para ampliar)', () => iniciarLupa(x, y), 'Alt+L'));
+    if (!sel.trim()) items.push(boton('Anclar esta página en un post-it', anclar, 'Alt+K'));
     items.push(boton('Nuevo post-it', () => crearNota('')));
     items.push(boton('Copiar título y dirección', () => copiar(document.title + '\n' + location.href)));
     items.push(boton('Guardar esta página en la hoja', () => guardar({ tipo: 'pagina', valor: location.origin + location.pathname, nota: document.title })));
@@ -865,39 +877,155 @@
   // Si la categoría de un post-it ya no existe, pasa a «Gestión» o, si tampoco existe, a la primera.
   const respaldoCat = (lista) => lista.find((c) => c.id === 'gestion') || lista[0];
   const categoria = (id) => { const l = categorias(); return l.find((c) => c.id === id) || respaldoCat(l); };
-  function estadoNotas() {
-    const e = GM_getValue('postits', null) || {};
-    return { dia: e.dia || '', notas: Array.isArray(e.notas) ? e.notas : [], papelera: Array.isArray(e.papelera) ? e.papelera : [] };
+  // Cada post-it vive en su propia clave («postit:<id>»). Así dos pestañas que editan a la vez
+  // solo escriben el post-it que cambiaron y no se pisan el resto.
+  const CLAVE_NOTA = 'postit:';
+  function migrarNotas() { // formato hasta la 2.3.3: todo en una sola clave «postits»
+    const viejo = GM_getValue('postits', null);
+    if (!viejo) return;
+    const ahora = Date.now();
+    (viejo.notas || []).forEach((n, i) => { if (!GM_getValue(CLAVE_NOTA + n.id, null)) GM_setValue(CLAVE_NOTA + n.id, Object.assign({ orden: ahora - i, v: ahora }, n)); });
+    (viejo.papelera || []).forEach((n) => { if (!GM_getValue(CLAVE_NOTA + n.id, null)) GM_setValue(CLAVE_NOTA + n.id, Object.assign({ orden: 0, v: ahora }, n)); });
+    if (viejo.dia && !GM_getValue('postits:dia', '')) GM_setValue('postits:dia', viejo.dia);
+    GM_deleteValue('postits');
   }
+  function leerNotas() {
+    migrarNotas();
+    return GM_listValues().filter((k) => k.startsWith(CLAVE_NOTA))
+      .map((k) => GM_getValue(k, null)).filter((n) => n && n.id && Array.isArray(n.items));
+  }
+  function estadoNotas() {
+    const todas = leerNotas();
+    return {
+      dia: GM_getValue('postits:dia', ''),
+      notas: todas.filter((n) => !n.borrada).sort((a, b) => (b.orden || 0) - (a.orden || 0)),
+      papelera: todas.filter((n) => n.borrada).sort((a, b) => b.borrada - a.borrada),
+    };
+  }
+  // Aplica un cambio y escribe solo los post-its que cambiaron. Cada cambio hecho en esta pestaña
+  // queda marcado para la bitácora de la hoja.
   function mutarNotas(fn) {
-    const e = estadoNotas();
+    const antes = estadoNotas();
+    const previo = new Map([...antes.notas, ...antes.papelera].map((n) => [n.id, JSON.stringify(n)]));
+    const e = JSON.parse(JSON.stringify(antes));
     fn(e);
-    const limite = Date.now() - PAPELERA_DIAS * 864e5;
-    e.papelera = e.papelera.filter((n) => n.borrada > limite).slice(0, 100);
-    GM_setValue('postits', e);
+    const ahora = Date.now(), limite = ahora - PAPELERA_DIAS * 864e5;
+    const vistas = new Set();
+    let cambio = false, tapados = 0;
+    const escribir = (n, enPapelera) => {
+      if (!n || vistas.has(n.id)) return;
+      vistas.add(n.id);
+      if (enPapelera) { if (!n.borrada) n.borrada = ahora; } else delete n.borrada;
+      if (n.borrada && n.borrada < limite) { if (previo.has(n.id)) { GM_deleteValue(CLAVE_NOTA + n.id); cambio = true; } return; }
+      tapados += limpiarNota(n);
+      if (JSON.stringify(n) === previo.get(n.id)) return;
+      const eraBorrada = previo.has(n.id) && JSON.parse(previo.get(n.id)).borrada;
+      n.v = ahora;
+      if (!n.orden) n.orden = ahora;
+      GM_setValue(CLAVE_NOTA + n.id, n);
+      cambio = true;
+      if (!eraBorrada || !n.borrada) marcarBitacora(n.id);
+    };
+    e.notas.forEach((n) => escribir(n, false));
+    e.papelera.forEach((n) => escribir(n, true));
+    for (const id of previo.keys()) if (!vistas.has(id)) { GM_deleteValue(CLAVE_NOTA + id); cambio = true; }
+    if (e.dia !== antes.dia) { GM_setValue('postits:dia', e.dia); cambio = true; }
+    if (cambio) GM_setValue('postits:cambio', { t: ahora, tab: ID_TAB });
+    if (tapados) {
+      toast(`Tapé ${tapados} ${tapados === 1 ? 'cosa que parecía' : 'cosas que parecían'} un secreto: en los post-its no se guardan claves.`, 'aviso');
+      if (tarjeta) setTimeout(() => pintarTarjeta(), 0);
+    }
     pintarPostits();
     return e;
   }
   const buscarNota = (e, id) => e.notas.find((n) => n.id === id);
-  const origenActual = () => ({ url: location.origin + location.pathname, pagina: corto(document.title || HOST, 120) });
+
+  // ── Secretos: nunca en un post-it ni en la hoja ──
+  const PREFIJOS_SECRETO = /\b(?:sk-[A-Za-z0-9_-]{16,}|sk_live_[A-Za-z0-9]{10,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|pit-[A-Za-z0-9-]{16,}|tskey-[A-Za-z0-9-]{16,}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,})/g;
+  const PEM = /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g;
+  const ASIGNACION = /\b((?:pass(?:word)?|contrase(?:ñ|n)a|clave|token|secret[o]?|api[_-]?key|apikey|llave)\s*[:=]\s*)(\S{6,})/gi;
+  function palabraSecreta(w) {
+    if (/^https?:\/\//i.test(w) || /@/.test(w)) return false;
+    const may = (w.match(/[A-Z]/g) || []).length, min = (w.match(/[a-z]/g) || []).length;
+    const dig = (w.match(/\d/g) || []).length, sim = (w.match(/[!-\/:-@[-`{-~]/g) || []).length;
+    if (w.length >= 12 && may >= 2 && min >= 1 && dig >= 2 && sim >= 1) return true;
+    if (w.length >= 24 && may >= 3 && min >= 3 && dig >= 3 && new Set(w).size >= 16) return true;
+    return false;
+  }
+  function taparSecretos(texto) {
+    let n = 0;
+    const tapa = () => { n++; return '[secreto omitido]'; };
+    let t = String(texto || '').replace(PEM, tapa).replace(PREFIJOS_SECRETO, tapa)
+      .replace(ASIGNACION, (m, a, v) => { if (!/[\d!-\/:-@[-`{-~]/.test(v)) return m; n++; return a + '[secreto omitido]'; });
+    t = t.replace(/\S{12,}/g, (w) => {
+      const limpia = w.replace(/^[("'«“]+|[)"'».,;:”]+$/g, '');
+      return palabraSecreta(limpia) ? w.replace(limpia, tapa()) : w;
+    });
+    return { texto: t, n };
+  }
+  function limpiarNota(n) {
+    let total = 0;
+    const tapar = (v) => { const r = taparSecretos(v); total += r.n; return r.texto; };
+    n.titulo = tapar(n.titulo);
+    n.contexto = tapar(n.contexto);
+    for (const i of n.items) i.texto = tapar(i.texto);
+    return total;
+  }
+  const PARAM_SENSIBLE = /token|key|secret|pass|auth|code|sig|cred|session|jwt|otp|nonce|ticket/i;
+  // La dirección para volver: dominio, ruta y solo los parámetros que no pueden ser claves
+  // (el chat de Hermes vive en ?resume=…). El fragmento se conserva solo si es una ruta (#/…).
+  function urlSegura(href) {
+    try {
+      const u = new URL(href);
+      u.username = ''; u.password = '';
+      for (const [k, v] of [...u.searchParams]) {
+        if (PARAM_SENSIBLE.test(k) || v.length > 200 || taparSecretos(v).n || palabraSecreta(v) || (v.length >= 16 && /[A-Z]/.test(v) && /[a-z]/.test(v) && /\d/.test(v))) u.searchParams.delete(k);
+      }
+      u.hash = /^#\//.test(u.hash) ? u.hash : '';
+      return u.toString();
+    } catch (_) { return location.origin + location.pathname; }
+  }
+  const sinFragmento = (u) => String(u || '').split('#:~:')[0].replace(/#$/, '');
+  // Texto con el que se vuelve al párrafo: el comienzo de lo seleccionado, en palabras completas.
+  function textoAncla(sel) {
+    const linea = String(sel || '').split(/\n/).map((x) => x.trim()).find((x) => x.length > 3) || '';
+    if (linea.length <= 80) return linea;
+    const corte = linea.slice(0, 80);
+    return corte.slice(0, Math.max(corte.lastIndexOf(' '), 40)).trim();
+  }
+  const codificarFragmento = (t) => encodeURIComponent(t).replace(/-/g, '%2D').replace(/,/g, '%2C').replace(/&/g, '%26');
+  const horaBogota = (t) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(t ? new Date(t) : new Date()).replace(',', '');
+  // De dónde sale un post-it: título, sitio, dirección (con salto al párrafo si hay selección) y hora.
+  function origenActual(sel) {
+    const limpio = sel ? taparSecretos(sel) : { texto: '', n: 0 };
+    const ancla = sel && !limpio.n ? textoAncla(sel) : '';
+    const base = urlSegura(location.href);
+    const url = ancla ? base + (base.includes('#') ? ':~:text=' : '#:~:text=') + codificarFragmento(ancla) : base;
+    return { url, pagina: corto(document.title || HOST, 120), sitio: HOST, hora: horaBogota(), ancla };
+  }
   const tituloDe = (n) => n.titulo || (n.items[0] && corto(n.items[0].texto, 80)) || corto(n.contexto, 80) || 'Sin título';
 
+  function nuevaNota(texto, titulo) {
+    const o = origenActual(texto);
+    return {
+      id: nid(), orden: Date.now(), titulo: titulo || '', cat: categoria(GM_getValue('postits:ultimaCat', 'gestion')).id, contexto: '', creada: Date.now(),
+      origen: { url: o.url, pagina: o.pagina, sitio: o.sitio, hora: o.hora }, ancla: o.ancla,
+      items: texto ? [{ id: nid(), texto: texto.slice(0, 1000), hecho: false, t: Date.now(), url: o.url, pagina: o.pagina }] : [],
+    };
+  }
   function crearNota(texto) {
-    const id = nid();
-    const ultima = GM_getValue('postits:ultimaCat', 'gestion');
-    mutarNotas((e) => {
-      e.notas.unshift({
-        id, titulo: '', cat: categoria(ultima).id, contexto: '', creada: Date.now(),
-        items: texto ? [Object.assign({ id: nid(), texto: texto.slice(0, 1000), hecho: false, t: Date.now() }, origenActual())] : [],
-      });
-    });
+    const n = nuevaNota(texto);
+    const id = n.id;
+    mutarNotas((e) => { e.notas.unshift(n); });
     if (!cfg().postits) setCfg({ postits: true });
     abrirTarjeta(id, { foco: 'titulo' });
   }
   function agregarTarea(id, texto, conOrigen) {
     mutarNotas((e) => {
       const n = buscarNota(e, id);
-      if (n) n.items.push(Object.assign({ id: nid(), texto: texto.slice(0, 1000), hecho: false, t: Date.now() }, conOrigen ? origenActual() : {}));
+      if (!n) return;
+      const o = conOrigen ? origenActual(texto) : null;
+      n.items.push(Object.assign({ id: nid(), texto: texto.slice(0, 1000), hecho: false, t: Date.now() }, o ? { url: o.url, pagina: o.pagina } : {}));
     });
   }
   function borrarNota(id) {
@@ -944,7 +1072,7 @@
     const u = uiNotas();
     const e = estadoNotas();
     const hoy = hoyBogota();
-    if (!dock || !dock.isConnected) { dock = h('div', { class: 'pdock' }); s.insertBefore(dock, s.children[1] || null); }
+    if (!dock || dock.parentNode !== s) { dock = h('div', { class: 'pdock' }); s.insertBefore(dock, s.children[1] || null); }
     const alto = window.innerHeight;
     const top = Math.max(8, Math.min(Math.round((u.y ?? 0.22) * alto), alto - 140));
     dock.style.top = top + 'px';
@@ -987,7 +1115,9 @@
     const cabeza = h('div', { class: 'phead' },
       h('div', { class: 'fila' },
         h('b', null, 'Hoy · ' + diaCorto(hoy)),
-        h('button', { class: 'pnuevo', title: 'Nuevo post-it', on: { click: (ev) => { ev.stopPropagation(); crearNota(''); } } }, '+ Nuevo')),
+        h('span', { class: 'pbotones' },
+          h('button', { class: 'panclar', title: 'Anclar: post-it con el título, la hora y la dirección de esta página, y lo que tengas seleccionado (Alt+K)', on: { click: (ev) => { ev.stopPropagation(); anclar(); } } }, 'Anclar'),
+          h('button', { class: 'pnuevo', title: 'Nuevo post-it', on: { click: (ev) => { ev.stopPropagation(); crearNota(''); } } }, '+ Nuevo'))),
       h('div', { class: 'pres' }, e.notas.length ? `${pendientes} por hacer · ${e.notas.length} post-its` : 'Sin post-its'),
       filtros);
 
@@ -1065,7 +1195,7 @@
   function ubicarTarjeta() {
     if (!tarjeta) return;
     const n = tarjeta.nodo;
-    const d = dock && dock.isConnected ? dock.getBoundingClientRect() : { left: window.innerWidth, top: 80 };
+    const d = dock && dock.parentNode ? dock.getBoundingClientRect() : { left: window.innerWidth, top: 80 };
     const r = n.getBoundingClientRect();
     n.style.left = Math.max(8, d.left - r.width - 10) + 'px';
     n.style.top = Math.max(8, Math.min(d.top, window.innerHeight - r.height - 8)) + 'px';
@@ -1136,6 +1266,7 @@
     const hechas = n.items.filter((i) => i.hecho).length;
     nodo.replaceChildren(
       h('div', { class: 'pt-cab' }, chip, h('span', { class: 'pt-esp' }),
+        n.origen && n.origen.url ? icono('Volver ahí', 'Abrir la página de donde salió' + (n.ancla ? ' y saltar al párrafo' : ''), () => volverAhi(n)) : null,
         icono('Copiar', 'Copiar como texto', () => { guardarYa(); copiar(textoDeNota(buscarNota(estadoNotas(), id))); toast('Post-it copiado.', 'ok'); }),
         icono('Borrar', 'Mover a la papelera (se recupera durante 7 días)', () => { descartarPendientes(); tarjeta.nodo.remove(); tarjeta = null; borrarNota(id); toast('Post-it borrado. Se recupera 7 días desde el menú de Tampermonkey.', 'aviso'); }),
         icono('✕', 'Cerrar (Esc)', cerrarTarjeta)),
@@ -1145,7 +1276,7 @@
       contexto,
       h('div', { class: 'pt-pie' },
         h('span', null, n.items.length ? hechas + ' de ' + n.items.length + ' hechas' : 'Sin tareas'),
-        h('span', null, 'desde ' + diaCorto(fechaBogota(n.creada)))));
+        h('span', { title: n.origen ? n.origen.pagina : '' }, n.origen && n.origen.hora ? n.origen.hora.slice(11, 16) + ' · ' + diaCorto(n.origen.hora.slice(0, 10)) + ' · ' + corto(n.origen.sitio, 22) : 'desde ' + diaCorto(fechaBogota(n.creada)))));
     ubicarTarjeta();
     if (o.foco === 'titulo') titulo.focus();
     else if (o.foco === 'nueva') nueva.focus();
@@ -1212,6 +1343,7 @@
           if (i < 0) return;
           const [r] = x.papelera.splice(i, 1);
           delete r.borrada;
+          r.orden = Date.now();
           x.notas.unshift(r);
         });
         if (!cfg().postits) setCfg({ postits: true });
@@ -1302,8 +1434,102 @@
     ui().appendChild(velo);
   }
 
+  // ── Anclar (Alt+K) y volver ahí ──
+  function anclar() {
+    const sel = seleccionActual().texto.trim();
+    const n = nuevaNota(sel, corto(document.title || HOST, 120));
+    mutarNotas((e) => { e.notas.unshift(n); });
+    if (!cfg().postits) setCfg({ postits: true });
+    if (uiNotas().plegado) GM_setValue('postits:ui', Object.assign(uiNotas(), { plegado: false }));
+    pintarPostits();
+    toast('Anclado: ' + corto(n.titulo, 60) + (n.ancla ? ' · con salto al párrafo' : '') + '. «Volver ahí» está en el post-it.', 'ok');
+  }
+
+  function volverAhi(n) {
+    const o = n.origen || {};
+    if (!o.url) return;
+    const salto = { base: sinFragmento(o.url), texto: n.ancla || '', t: Date.now() };
+    if (sinFragmento(urlSegura(location.href)) === salto.base) {
+      if (salto.texto) buscarAncla(salto); else toast('Ya estás en la página de este post-it.', 'ok');
+      return;
+    }
+    GM_setValue('postits:salto', salto);
+    GM_openInTab(o.url, { active: true });
+  }
+  // Al cargar: si esta pestaña se abrió con «Volver ahí», busca el párrafo (la página puede tardar en mostrarlo).
+  function revisarSalto() {
+    const s = GM_getValue('postits:salto', null);
+    if (!s || Date.now() - s.t > 120000 || sinFragmento(urlSegura(location.href)) !== s.base) return;
+    GM_setValue('postits:salto', null);
+    if (s.texto) buscarAncla(s);
+  }
+  function buscarAncla(s) {
+    let intentos = 0;
+    const probar = () => {
+      intentos++;
+      if (encontrarTexto(s.texto)) { toast('Aquí estaba lo que anclaste.', 'ok'); return; }
+      if (intentos < 40) setTimeout(probar, 600);
+      else toast('Abrí la página, pero no encontré el párrafo. Si es un chat largo, desplázate hacia arriba para que cargue.', 'aviso');
+    };
+    probar();
+  }
+  function encontrarTexto(t) {
+    if (!t || typeof window.find !== 'function') return false;
+    const sel = getSelection();
+    sel.removeAllRanges();
+    if (!window.find(t, false, false, true, false, false, false)) return false;
+    if (sel.rangeCount) {
+      const el = sel.getRangeAt(0).startContainer.parentElement;
+      if (el) el.scrollIntoView({ block: 'center' });
+    }
+    return true;
+  }
+
+  // ── Bitácora en la hoja: pestaña «Post-its», solo se agregan filas ──
+  // Cada post-it creado, editado, terminado o borrado en esta pestaña manda una fila. Los cambios
+  // seguidos del mismo post-it se juntan (6 s) para no llenar la hoja de una fila por tecla.
+  const pendBitacora = new Set();
+  let timerBitacora = null, avisoBitacora = false;
+  function marcarBitacora(id) {
+    pendBitacora.add(id);
+    clearTimeout(timerBitacora);
+    timerBitacora = setTimeout(enviarBitacora, 6000);
+  }
+  const estadoBitacora = (n) => (n.borrada ? 'borrado' : n.items.length && n.items.every((i) => i.hecho) ? 'hecho' : 'abierto');
+  const textoBitacora = (n) => n.items.map((i) => (i.hecho ? '[x] ' : '[ ] ') + i.texto).concat(n.contexto ? [n.contexto] : []).join('\n');
+  function filaBitacora(n) {
+    const o = n.origen || {};
+    return {
+      tipo: 'postit', evento: nid(), id: n.id, hora: horaBogota(), tema: n.titulo || tituloDe(n), categoria: categoria(n.cat).nombre,
+      texto: textoBitacora(n), estado: estadoBitacora(n), sitio: o.sitio || '', url: o.url || '', perfil: cfg().perfil || '', version: VERSION,
+    };
+  }
+  function enviarBitacora() {
+    clearTimeout(timerBitacora);
+    if (!pendBitacora.size) return;
+    const todas = new Map(leerNotas().map((n) => [n.id, n]));
+    const ids = [...pendBitacora];
+    pendBitacora.clear();
+    for (const id of ids) {
+      const n = todas.get(id);
+      if (!n || (!n.titulo && !n.items.length && !n.contexto)) continue; // un post-it vacío no es nada todavía
+      mandarFila(filaBitacora(n));
+    }
+  }
+  async function mandarFila(datos) {
+    const c = cfg();
+    if (!c.endpoint || !c.token) { encolar(datos); return; } // se manda cuando el perfil se active
+    try {
+      const r = await post(c.endpoint, Object.assign({ token: c.token }, datos));
+      if (!r.ok) throw new Error(r.error === 'vacio' ? 'el receptor de la hoja todavía no conoce la pestaña Post-its' : r.error || 'rechazo');
+    } catch (e) {
+      encolar(datos);
+      if (!avisoBitacora) { avisoBitacora = true; toast('La bitácora de post-its quedó en cola (' + e.message + '). No se pierde: se reintenta sola.', 'aviso'); }
+    }
+  }
+
   function iniciarPostits() {
-    GM_addValueChangeListener('postits', (_k, _v, _n, remoto) => {
+    GM_addValueChangeListener('postits:cambio', (_k, _v, _n, remoto) => {
       if (!remoto) return;
       pintarPostits();
       if (tarjeta) {
@@ -1320,7 +1546,10 @@
       });
     }
     window.addEventListener('resize', () => { pintarPostits(); ubicarTarjeta(); });
+    window.addEventListener('pagehide', enviarBitacora);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) enviarBitacora(); });
     pintarPostits();
+    revisarSalto();
     setTimeout(() => revisarDia(), 1200);
     setInterval(() => { if (!document.hidden) revisarDia(); }, 5 * 60e3);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(() => revisarDia(), 600); });
@@ -2006,6 +2235,7 @@
     GM_registerMenuCommand('Recortar una zona', iniciarRecorte);
     GM_registerMenuCommand('Lupa (Alt+L)', () => iniciarLupa());
     const c = cfg();
+    GM_registerMenuCommand('Anclar en un post-it (Alt+K)', anclar);
     GM_registerMenuCommand('Nuevo post-it', () => crearNota(''));
     GM_registerMenuCommand((c.postits ? 'Ocultar' : 'Mostrar') + ' los post-its (Alt+N los pliega)', () => { setCfg({ postits: !cfg().postits }); if (!cfg().postits) cerrarTarjeta(); pintarPostits(); });
     GM_registerMenuCommand('Revisar los post-its del día', () => revisarDia(true));
@@ -2036,6 +2266,7 @@
   if (sitioDesactivado()) return;
 
   if (cfg().resaltar) iniciarResaltado();
+  vigilarRaiz();
   iniciarPuente();
   iniciarPostits();
 
@@ -2069,6 +2300,11 @@
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && abierto) { cerrar(); return; }
     if (e.key === 'Escape' && tarjeta) { cerrarTarjeta(); return; }
+    if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyK') {
+      e.preventDefault(); e.stopPropagation();
+      anclar();
+      return;
+    }
     if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyN') {
       e.preventDefault(); e.stopPropagation();
       plegarNotas();

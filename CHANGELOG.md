@@ -1,5 +1,20 @@
 # Cambios
 
+## 2.3.4 · 2026-11-04 00:20 (Bogotá)
+
+- **Anclar (Alt+K)**, botón *Anclar* en la pila y en el clic derecho: post-it con el título de la página, la hora de Bogotá, el sitio y la dirección con salto al párrafo seleccionado (`#:~:text=`). Lo seleccionado entra como tarea.
+- **Volver ahí** en cada post-it con origen: abre la página y, cuando el contenido carga (chats de una sola página), marca el párrafo anclado y lo deja a la vista.
+- **«+ Nuevo» también guarda el origen** (título, sitio, dirección y hora); se ve al pie de la tarjeta.
+- **Bitácora en la hoja:** cada post-it creado, editado, terminado o borrado agrega una fila a la pestaña *Post-its* (13 columnas, compartidas con los chats de Claude). Cambios seguidos se juntan (6 s). Sin conexión, sin activar o con el receptor viejo, la fila espera en la cola existente. La cola no guarda la clave.
+- **Receptor de Apps Script:** `postit_()` agrega a *Post-its* sin repetir eventos y sin editar filas. **Hay que pegarlo y publicar una versión nueva de la misma implementación** (ver `apps-script/LEEME.md`). Mientras tanto, las filas esperan en la cola.
+- **Secretos:** lo que parece una clave se reemplaza por `[secreto omitido]` antes de guardarse en un post-it; la dirección pierde los parámetros sensibles y no lleva salto si el texto tenía algo así.
+- **Arreglos:** la interfaz vive en `<html>` y se repone sola si la página la borra (ChatGPT y otras apps de una sola página). Cada post-it se guarda en su propia clave: dos pestañas que editan post-its distintos a la vez ya no se pisan. Los post-its guardados con la 2.3.3 se migran solos.
+- Sin permisos nuevos (`@grant` y `@connect` iguales a la 2.3.3).
+- Pruebas: `tests/bitacora.mjs` (36 casos) y `tests/receptor.mjs` (13 casos, Apps Script con hoja simulada). Controles negativos sobre la fusión entre pestañas, la reposición de la interfaz, la agrupación de cambios, la cola sin activar, el falso positivo de «clave:» y la deduplicación del receptor.
+- AGENTS.md, regla 6: excepción documentada para la dirección de los post-its.
+
+Origen: pedido de Steeve en el chat https://claude.ai/chat/5658e950-6b45-4967-93af-7c220e4f7d88 (3-nov-2026 23:44).
+
 ## 2.3.3 · 2026-10-29 05:13 (Bogotá)
 
 - **Copiar imagen** en el clic derecho sobre una imagen. Antes el menú propio solo ofrecía copiar su dirección y tapaba el «Copiar imagen» de Chrome. Las imágenes de otros sitios se descargan por Tampermonkey (`@connect *`).

@@ -13,6 +13,10 @@
 - Teléfonos y correos repetidos no se duplican: la respuesta devuelve la fila donde ya estaban.
 - `LockService` serializa las escrituras simultáneas de varias pestañas o perfiles.
 
+## Pestaña «Post-its»
+
+Desde la 2.3.4 del script, el receptor también escribe la bitácora de post-its en la pestaña **Post-its** (13 columnas, ver el README del repositorio). Solo agrega filas; si el mismo evento llega dos veces por un reintento de la cola, no lo repite. Si la pestaña no existe, la crea.
+
 ## Cambiar el código sin cambiar la dirección
 
 Pegar `Codigo.gs` en el editor › Implementar › **Gestionar implementaciones** › lápiz › Versión: *Nueva versión* › Implementar. Si se crea una implementación *nueva*, cambia la dirección y hay que reactivar todos los perfiles.

@@ -73,7 +73,17 @@ const clic = (p, sel, texto) => p.evaluate(([s, t]) => {
   const b = [...window.__sombra.querySelectorAll(s)].find((x) => !t || x.textContent.trim().startsWith(t));
   if (!b) return false; b.click(); return true;
 }, [sel, texto || '']);
-const estado = () => JSON.parse(JSON.stringify(memoria.postits || { notas: [], papelera: [] }));
+// Estado reconstruido desde las claves por post-it («postit:<id>»), como lo lee el script.
+const estado = () => {
+  const todas = Object.keys(memoria).filter((k) => k.startsWith('postit:') && memoria[k]).map((k) => JSON.parse(JSON.stringify(memoria[k])));
+  return {
+    dia: memoria['postits:dia'] || '',
+    notas: todas.filter((n) => !n.borrada).sort((a, b) => (b.orden || 0) - (a.orden || 0)),
+    papelera: todas.filter((n) => n.borrada).sort((a, b) => b.borrada - a.borrada),
+  };
+};
+// Siembra en el formato anterior (una sola clave «postits»): el script la migra al cargar.
+const sembrar = (v) => { for (const k of Object.keys(memoria)) if (k.startsWith('postit:') || k === 'postits:dia') delete memoria[k]; memoria.postits = v; };
 async function seleccionar(p, id) {
   await p.evaluate((i) => { const r = document.createRange(); r.selectNodeContents(document.getElementById(i)); getSelection().removeAllRanges(); getSelection().addRange(r); }, id);
 }
@@ -84,7 +94,7 @@ async function clicDerecho(p, id) {
 }
 
 // 1. Primer arranque: pestaña visible, sin pregunta de día nuevo
-const A = await abrirPestana('https://prueba.local/tablero?token=SECRETO#x');
+const A = await abrirPestana('https://prueba.local/tablero?token=SECRETO&resume=local-abc123&k=Ab3Xy9Qw7Zt2Lm8Np4Rs6Uv#x');
 await A.waitForTimeout(1400);
 ok((await textos(A, '.ptab')).some((t) => t.startsWith('Post-its')), 'la pestaña «Post-its» aparece en el borde derecho');
 ok(!(await textos(A, '.pmodal')).length, 'sin post-its no hay pregunta de día nuevo');
@@ -99,7 +109,10 @@ ok(await clic(A, '.menu button', 'Nuevo post-it con esto'), 'el submenú ofrece 
 await A.waitForTimeout(100);
 let e = estado();
 ok(e.notas.length === 1 && e.notas[0].items[0].texto === 'Llamar a Fabián por la cotización del salón', 'se crea el post-it con lo seleccionado como tarea');
-ok(e.notas[0].items[0].url === 'https://prueba.local/tablero', 'la tarea guarda la página de origen sin parámetros (no se lleva el token de la URL)');
+const u0 = e.notas[0].items[0].url;
+ok(u0.startsWith('https://prueba.local/tablero?resume=local-abc123#:~:text=Llamar%20a%20Fabi'), `la dirección conserva el chat (?resume=) y salta al párrafo: ${u0}`);
+ok(!/SECRETO|Ab3Xy9|token|#x/.test(u0), 'la dirección no se lleva el token, ni valores con forma de clave, ni el fragmento original');
+ok(e.notas[0].origen && e.notas[0].origen.url === u0 && /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(e.notas[0].origen.hora), 'el post-it guarda su origen con la hora de Bogotá');
 ok(await sombra(A, () => window.__sombra.activeElement && window.__sombra.activeElement.classList.contains('pt-titulo')), 'la tarjeta se abre con el cursor en el título');
 
 // 3. Escribir el título no dispara los atajos de la página
@@ -162,7 +175,7 @@ ok((await textos(B, '.pmini .pm-prog')).some((t) => t.includes('2/4')), 'marcar 
 await A.keyboard.press('Escape');
 
 // 9. Filtro por categoría
-await A.evaluate(() => { const e = GM_getValue('postits'); e.notas.push({ id: 'z1', titulo: 'Idea de estados', cat: 'ideas', contexto: '', creada: Date.now(), items: [] }); GM_setValue('postits', e); });
+await A.evaluate(() => { GM_setValue('postit:z1', { id: 'z1', orden: 1, titulo: 'Idea de estados', cat: 'ideas', contexto: '', creada: Date.now(), items: [] }); GM_setValue('postits:cambio', { t: Date.now() }); });
 await A.evaluate(() => window.__sombra.querySelector('.ptab').click()); await A.evaluate(() => window.__sombra.querySelector('.ptab').click());
 await A.waitForTimeout(60);
 ok((await textos(A, '.pmini')).length === 2, 'con dos categorías se ven los dos post-its');
@@ -223,7 +236,7 @@ const NOTAS = () => [
   { id: 'n2', titulo: 'Terminada', cat: 'operacion', contexto: '', creada: t0, items: [{ id: 'c', texto: 'hecha', hecho: true }] },
   { id: 'n3', titulo: 'Solo título', cat: 'ideas', contexto: '', creada: t0, items: [] },
 ];
-memoria.postits = DIA_ANTERIOR(NOTAS()); memoria['postits:revision'] = null; memoria['postits:pospuesto'] = 0;
+sembrar(DIA_ANTERIOR(NOTAS())); memoria['postits:revision'] = null; memoria['postits:pospuesto'] = 0;
 C = await abrirPestana('https://prueba.local/manana');
 await C.waitForTimeout(1500);
 const cab = (await textos(C, '.pmodal h2'))[0] || '';
@@ -241,7 +254,7 @@ ok(!(await textos(C, '.pmodal')).length && memoria['postits:revision'] === null,
 await C.close(); paginas.clear();
 
 // 15. «Borrar todos» y «Aplicar mi selección»
-memoria.postits = DIA_ANTERIOR(NOTAS());
+sembrar(DIA_ANTERIOR(NOTAS()));
 C = await abrirPestana('https://prueba.local/manana');
 await C.waitForTimeout(1500);
 await clic(C, '.pm-acciones button', 'Borrar todos');
@@ -249,7 +262,7 @@ await C.waitForTimeout(80);
 ok(!estado().notas.length && estado().papelera.length === 3, '«Borrar todos» deja el día en blanco y todo en la papelera');
 await C.close(); paginas.clear();
 
-memoria.postits = DIA_ANTERIOR(NOTAS());
+sembrar(DIA_ANTERIOR(NOTAS()));
 C = await abrirPestana('https://prueba.local/manana');
 await C.waitForTimeout(1500);
 await C.evaluate(() => [...window.__sombra.querySelectorAll('.pm-nota')].find((n) => n.textContent.includes('Terminada')).click());
@@ -260,7 +273,7 @@ ok(e.notas.map((n) => n.id).join() === 'n1,n3' && e.notas[0].items.length === 2,
 await C.close(); paginas.clear();
 
 // 16. Una sola pestaña pregunta: con el turno tomado por otra pestaña reciente, no pregunta
-memoria.postits = DIA_ANTERIOR(NOTAS());
+sembrar(DIA_ANTERIOR(NOTAS()));
 memoria['postits:revision'] = { id: 'otra-pestana', t: Date.now() };
 C = await abrirPestana('https://prueba.local/manana');
 await C.waitForTimeout(1500);

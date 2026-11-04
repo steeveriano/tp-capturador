@@ -7,9 +7,16 @@
  * Si el proyecto no está pegado a la hoja (proyecto independiente), la hoja se indica en
  * Propiedades del script › HOJA_ID con el identificador que aparece en la URL de la hoja.
  * Ejecuta configurar() una vez: crea la pestaña, le da formato y genera la clave.
+ * La pestaña «Post-its» se crea sola con el primer post-it (o ya existe): solo agrega filas.
  */
 
 const PESTANA = 'Capturas';
+// Bitácora de post-its: la escriben el TP Capturador (origen «script») y los chats de Claude
+// (origen «claude»). Solo se agregan filas: nunca se editan ni se borran.
+const PESTANA_POSTITS = 'Post-its';
+const ENC_POSTITS = ['Id post-it', 'Hora (Bogotá)', 'Origen', 'Tema', 'Categoría', 'Texto · decisión o pendiente',
+  'Siguiente paso', 'Estado', 'Sitio', 'URL', 'Proyecto o chat', 'Perfil', 'Evento'];
+const ESTADOS_POSTIT = ['abierto', 'hecho', 'borrado'];
 const ENCABEZADOS = ['Fecha (Bogotá)', 'Tipo', 'Valor', 'Nota', 'Sitio', 'Título de la página', 'Dirección', 'Perfil', 'Versión'];
 const CON_DEDUP = ['telefono', 'correo'];
 const ZONA = 'America/Bogota';
@@ -27,6 +34,8 @@ function doPost(e) {
   }
   const token = PropertiesService.getScriptProperties().getProperty('TOKEN');
   if (!token || datos.token !== token) return json_({ ok: false, error: 'token' });
+
+  if (datos.tipo === 'postit') return postit_(datos);
 
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
@@ -58,6 +67,46 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/** Una fila nueva en «Post-its». Si el mismo evento llega dos veces (reintento de la cola), no se repite. */
+function postit_(datos) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const hoja = hojaPostits_();
+    const evento = limpiar_(datos.evento, 40);
+    if (evento && hoja.getLastRow() > 1) {
+      const ya = hoja.getRange(2, 13, hoja.getLastRow() - 1, 1).createTextFinder(evento).matchEntireCell(true).findNext();
+      if (ya) return json_({ ok: true, repetido: true, fila: ya.getRow() });
+    }
+    const hora = /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(datos.hora || '')
+      ? datos.hora : Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd HH:mm:ss');
+    const estado = ESTADOS_POSTIT.indexOf(datos.estado) >= 0 ? datos.estado : 'abierto';
+    hoja.appendRow([
+      limpiar_(datos.id, 40), hora, 'script',
+      limpiar_(datos.tema, 300), limpiar_(datos.categoria, 40), limpiar_(datos.texto, 20000),
+      '', estado, limpiar_(datos.sitio, 200), limpiar_(datos.url, 2000), '', limpiar_(datos.perfil, 80), evento,
+    ]);
+    return json_({ ok: true, fila: hoja.getLastRow() });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function hojaPostits_() {
+  const libro = libro_();
+  let hoja = libro.getSheetByName(PESTANA_POSTITS);
+  if (!hoja) {
+    hoja = libro.insertSheet(PESTANA_POSTITS);
+    const enc = hoja.getRange(1, 1, 1, ENC_POSTITS.length);
+    enc.setValues([ENC_POSTITS])
+      .setFontWeight('bold').setFontColor('#FFFFFF').setBackground('#1F3A5F')
+      .setFontFamily('Arial').setFontSize(10).setVerticalAlignment('middle');
+    hoja.setFrozenRows(1);
+    hoja.getRange('A:B').setNumberFormat('@');
+  }
+  return hoja;
 }
 
 /** Ejecutar una vez a mano. Crea la pestaña con formato y la clave, y la imprime en el registro. */
