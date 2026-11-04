@@ -54,6 +54,7 @@ Si hay un script viejo "Sales TierraParaíso — Capturador de Contactos", **hay
 - **Varias pestañas:** cada post-it se guarda aparte; si dos pestañas editan post-its distintos al mismo tiempo, se conservan los dos cambios.
 - **Papelera:** lo borrado se recupera durante 7 días desde el menú de Tampermonkey › *Recuperar post-its borrados*.
 - Lo que escribes en un post-it no dispara los atajos de teclado de la página (Gmail, GitHub, etc.).
+- **Pegar** (Ctrl+V) en un post-it funciona también en claude.ai y ChatGPT, que atrapan el pegado de toda la página. **+ Nuevo** con texto seleccionado lo usa como primera tarea.
 
 ## Pestaña «Post-its» de la hoja
 

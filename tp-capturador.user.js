@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TP Capturador
 // @namespace    https://github.com/steeveriano/tp-capturador
-// @version      2.3.4
+// @version      2.3.5
 // @description  Contactos a Google Sheets, menú propio de clic derecho, historial del portapapeles, recorte de zonas, post-its del día y puente Hermes ⇄ ChatGPT.
 // @author       Steeve Riaño · tierraparaiso
 // @homepageURL  https://github.com/steeveriano/tp-capturador
@@ -39,7 +39,7 @@
   'use strict';
   if (window.top !== window.self) return;
 
-  const VERSION = '2.3.4';
+  const VERSION = '2.3.5';
   const REPO = 'https://github.com/steeveriano/tp-capturador';
   const HOST = location.hostname;
 
@@ -746,7 +746,7 @@
     items.push(boton('Recortar una zona…', iniciarRecorte));
     items.push(boton('Lupa (rueda para ampliar)', () => iniciarLupa(x, y), 'Alt+L'));
     if (!sel.trim()) items.push(boton('Anclar esta página en un post-it', anclar, 'Alt+K'));
-    items.push(boton('Nuevo post-it', () => crearNota('')));
+    items.push(boton(sel.trim() ? 'Nuevo post-it con lo seleccionado' : 'Nuevo post-it', () => crearNota(sel.trim())));
     items.push(boton('Copiar título y dirección', () => copiar(document.title + '\n' + location.href)));
     items.push(boton('Guardar esta página en la hoja', () => guardar({ tipo: 'pagina', valor: location.origin + location.pathname, nota: document.title })));
     items.push(sep());
@@ -1117,7 +1117,7 @@
         h('b', null, 'Hoy · ' + diaCorto(hoy)),
         h('span', { class: 'pbotones' },
           h('button', { class: 'panclar', title: 'Anclar: post-it con el título, la hora y la dirección de esta página, y lo que tengas seleccionado (Alt+K)', on: { click: (ev) => { ev.stopPropagation(); anclar(); } } }, 'Anclar'),
-          h('button', { class: 'pnuevo', title: 'Nuevo post-it', on: { click: (ev) => { ev.stopPropagation(); crearNota(''); } } }, '+ Nuevo'))),
+          h('button', { class: 'pnuevo', title: 'Nuevo post-it (si hay texto seleccionado, entra como tarea con su origen)', on: { click: (ev) => { ev.stopPropagation(); crearNota(seleccionActual().texto.trim()); } } }, '+ Nuevo'))),
       h('div', { class: 'pres' }, e.notas.length ? `${pendientes} por hacer · ${e.notas.length} post-its` : 'Sin post-its'),
       filtros);
 
@@ -2236,7 +2236,7 @@
     GM_registerMenuCommand('Lupa (Alt+L)', () => iniciarLupa());
     const c = cfg();
     GM_registerMenuCommand('Anclar en un post-it (Alt+K)', anclar);
-    GM_registerMenuCommand('Nuevo post-it', () => crearNota(''));
+    GM_registerMenuCommand('Nuevo post-it', () => crearNota(seleccionActual().texto.trim()));
     GM_registerMenuCommand((c.postits ? 'Ocultar' : 'Mostrar') + ' los post-its (Alt+N los pliega)', () => { setCfg({ postits: !cfg().postits }); if (!cfg().postits) cerrarTarjeta(); pintarPostits(); });
     GM_registerMenuCommand('Revisar los post-its del día', () => revisarDia(true));
     GM_registerMenuCommand('Categorías de post-its', editarCategorias);
@@ -2261,6 +2261,23 @@
   }
 
   // ───────────────────────── Arranque ─────────────────────────
+  // Pegar en un campo del script: claude.ai, ChatGPT y otras apps atrapan todo lo que se pega en
+  // la página para llevarlo a su propia caja. Lo que se pega en un campo nuestro no les llega; y si
+  // una de ellas ya lo bloqueó antes que nosotros, se escribe a mano.
+  window.addEventListener('paste', (e) => {
+    const t = e.composedPath()[0];
+    if (!raiz || !e.composedPath().includes(raiz) || !(t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement)) return;
+    e.stopImmediatePropagation();
+    if (!e.defaultPrevented) return;
+    const texto = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+    if (!texto) return;
+    t.focus();
+    if (!document.execCommand('insertText', false, texto)) {
+      t.setRangeText(texto, t.selectionStart, t.selectionEnd, 'end');
+      t.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }, true);
+
   revisarActivacion();
   registrarComandos();
   if (sitioDesactivado()) return;

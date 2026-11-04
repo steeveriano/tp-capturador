@@ -1,5 +1,13 @@
 # Cambios
 
+## 2.3.5 · 2026-11-04 03:37 (Bogotá)
+
+- **Pegar dentro de un post-it ya funciona en claude.ai, ChatGPT y apps parecidas.** Esas páginas atrapan todo lo que se pega para llevarlo a su propia caja. Ahora lo que se pega en un campo del script no les llega; y si una página lo bloquea antes de que cargue el script, el texto se escribe igual en el campo (en ese caso la página también puede quedarse con su copia).
+- **«+ Nuevo» usa lo seleccionado:** si hay texto seleccionado, entra como tarea con su origen y el salto al párrafo, igual que «Agregar post-it». También en el clic derecho («Nuevo post-it con lo seleccionado») y en el menú de Tampermonkey.
+- Pruebas: `tests/pegar.mjs` (10 casos) con dos páginas que atrapan el pegado (desde el documento y desde la ventana); controles negativos sobre el aislamiento del pegado, la escritura a mano y la selección en «+ Nuevo».
+
+Origen: reporte de Steeve en el chat https://claude.ai/chat/5658e950-6b45-4967-93af-7c220e4f7d88 (4-nov-2026 03:32), con captura en claude.ai.
+
 ## 2.3.4 · 2026-11-04 00:14 (Bogotá)
 
 - **Anclar (Alt+K)**, botón *Anclar* en la pila y en el clic derecho: post-it con el título de la página, la hora de Bogotá, el sitio y la dirección con salto al párrafo seleccionado (`#:~:text=`). Lo seleccionado entra como tarea.
