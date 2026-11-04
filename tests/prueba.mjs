@@ -32,7 +32,8 @@ const navegador = await chromium.launch();
 const ctx = await navegador.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
 const pagina = await ctx.newPage();
 const recibidos = [];
-pagina.on('dialog', async (d) => { await d.accept(d.type() === 'prompt' ? 'Perfil Prueba' : undefined); });
+let dialogos = 0;
+pagina.on('dialog', async (d) => { dialogos++; await d.accept(d.type() === 'prompt' ? 'Perfil Prueba' : undefined); });
 pagina.on('pageerror', (e) => fallas.push('error de página: ' + e.message));
 
 await ctx.route('https://prueba.local/**', (r) => r.fulfill({ contentType: 'text/html', body: PAGINA }));
@@ -92,6 +93,11 @@ async function centroDe(sel, sub) {
 
 // 1. Activación desde el enlace de la bóveda
 await cargar(`https://github.com/steeveriano/tp-capturador#tp-activar&e=${encodeURIComponent(ENDPOINT)}&k=${TOKEN}&h=${encodeURIComponent('https://docs.google.com/spreadsheets/d/x')}`);
+ok(!dialogos, 'la activación no usa ventanas nativas de Chrome (pueden no mostrarse)');
+ok((await enSombra('.activacion h2'))[0] === 'Activar TP Capturador en este perfil', 'la activación pregunta con un cuadro dentro de la página');
+await pagina.evaluate(() => { const i = window.__sombra.querySelector('.activacion input'); i.value = 'Perfil Prueba'; });
+await clicEnSombra('Activar');
+await pagina.waitForTimeout(100);
 const cfg = await pagina.evaluate(() => GM_getValue('cfg', {}));
 ok(cfg.endpoint === ENDPOINT && cfg.token === TOKEN && cfg.perfil === 'Perfil Prueba', 'activación guarda endpoint, clave y perfil');
 ok(!(await pagina.evaluate(() => location.hash)), 'la clave se borra de la barra de direcciones');

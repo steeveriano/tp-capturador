@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TP Capturador
 // @namespace    https://github.com/steeveriano/tp-capturador
-// @version      2.3.5
+// @version      2.3.6
 // @description  Contactos a Google Sheets, menú propio de clic derecho, historial del portapapeles, recorte de zonas, post-its del día y puente Hermes ⇄ ChatGPT.
 // @author       Steeve Riaño · tierraparaiso
 // @homepageURL  https://github.com/steeveriano/tp-capturador
@@ -39,7 +39,7 @@
   'use strict';
   if (window.top !== window.self) return;
 
-  const VERSION = '2.3.5';
+  const VERSION = '2.3.6';
   const REPO = 'https://github.com/steeveriano/tp-capturador';
   const HOST = location.hostname;
 
@@ -258,6 +258,7 @@
     .pc-color { all: unset; cursor: pointer; width: 18px; height: 18px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px #111827, 0 0 0 3px #4b5563; }
     .pc-nombre { all: unset; flex: 1; padding: 4px 7px; border-radius: 5px; background: #1f2937; color: #f9fafb; }
     .pc-usos { color: #9ca3af; font-size: 11px; width: 70px; text-align: right; }
+    .activacion .pc-nombre { display: block; margin: 10px 20px 16px; padding: 9px 11px; font-size: 14px; }
     .pc-quitar { all: unset; cursor: pointer; color: #fca5a5; font-size: 11.5px; padding: 3px 6px; border-radius: 5px; }
     .pc-quitar:hover { background: #3f1d1d; }
   `;
@@ -2202,10 +2203,34 @@
     const endpoint = p.get('e') || '', token = p.get('k') || '', hoja = p.get('h') || '';
     history.replaceState(null, '', location.pathname + location.search);
     if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(endpoint) || token.length < 20) { toast('El enlace de activación está incompleto o dañado.', 'error'); return; }
-    if (!confirm('¿Activar TP Capturador en este perfil de Chrome?\n\nLas capturas irán a tu hoja de Google.')) return;
-    const perfil = prompt('Nombre de este perfil (para saber de dónde vino cada captura):', cfg().perfil || '') || cfg().perfil || 'sin nombre';
-    setCfg({ endpoint, token, hoja, perfil });
-    toast(`Activado en el perfil "${perfil}". Prueba: selecciona un texto y pulsa Guardar.`, 'ok');
+    mostrarActivacion(endpoint, token, hoja);
+  }
+
+  // Cuadro propio, no la ventana nativa de Chrome: la nativa no aparece cuando la pestaña se abre
+  // desde el atajo del Escritorio con Chrome detrás, y la activación se perdía sin aviso.
+  function mostrarActivacion(endpoint, token, hoja) {
+    const nombre = h('input', { class: 'pc-nombre', type: 'text', maxlength: '60', placeholder: 'Por ejemplo: Steeve personal' });
+    nombre.value = cfg().perfil || '';
+    const activar = () => {
+      const perfil = nombre.value.trim() || 'sin nombre';
+      setCfg({ endpoint, token, hoja, perfil });
+      velo.remove();
+      toast(`Activado en el perfil "${perfil}". Lo que estaba en cola sale ahora.`, 'ok');
+      setTimeout(() => vaciarCola(true), 600);
+    };
+    nombre.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); activar(); } });
+    const caja = h('div', { class: 'pmodal pequeno activacion', role: 'dialog', 'aria-label': 'Activar TP Capturador' },
+      h('header', null,
+        h('h2', null, 'Activar TP Capturador en este perfil'),
+        h('p', null, 'Las capturas y la bitácora de post-its irán a tu hoja de Google. Escribe un nombre para reconocer este perfil de Chrome.')),
+      nombre,
+      h('footer', null,
+        h('button', { on: { click: () => velo.remove() } }, 'Cancelar'),
+        h('span', { class: 'pt-esp' }),
+        h('button', { class: 'prim', on: { click: activar } }, 'Activar')));
+    const velo = h('div', { class: 'pvelo' }, caja);
+    ui().appendChild(velo);
+    setTimeout(() => nombre.focus(), 50);
   }
 
   function configurarAMano() {

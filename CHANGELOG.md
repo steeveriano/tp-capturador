@@ -1,5 +1,12 @@
 # Cambios
 
+## 2.3.6 · 2026-11-04 05:41 (Bogotá)
+
+- **La activación pregunta con un cuadro dentro de la página**, no con las ventanas nativas de Chrome. Esas ventanas pueden no mostrarse cuando la pestaña se abre desde el atajo del Escritorio con Chrome detrás: el script leía el enlace, borraba la clave de la dirección y la activación se perdía sin aviso. Verificado en el Chrome de Steeve que el script sí lee el enlace (prueba sin clave). Al activar, manda en seguida lo que estaba en cola.
+- Prueba: la activación no abre ventanas nativas y se completa con el cuadro.
+
+Origen: reporte de Steeve en el chat https://claude.ai/chat/5658e950-6b45-4967-93af-7c220e4f7d88 (4-nov-2026 05:30): el perfil seguía «sin activar» tras usar el atajo.
+
 ## 2.3.5 · 2026-11-04 03:37 (Bogotá)
 
 - **Pegar dentro de un post-it ya funciona en claude.ai, ChatGPT y apps parecidas.** Esas páginas atrapan todo lo que se pega para llevarlo a su propia caja. Ahora lo que se pega en un campo del script no les llega; y si una página lo bloquea antes de que cargue el script, el texto se escribe igual en el campo (en ese caso la página también puede quedarse con su copia).
