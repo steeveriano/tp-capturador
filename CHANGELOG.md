@@ -1,6 +1,6 @@
 # Cambios
 
-## 2.3.4 · 2026-11-04 00:20 (Bogotá)
+## 2.3.4 · 2026-11-04 00:14 (Bogotá)
 
 - **Anclar (Alt+K)**, botón *Anclar* en la pila y en el clic derecho: post-it con el título de la página, la hora de Bogotá, el sitio y la dirección con salto al párrafo seleccionado (`#:~:text=`). Lo seleccionado entra como tarea.
 - **Volver ahí** en cada post-it con origen: abre la página y, cuando el contenido carga (chats de una sola página), marca el párrafo anclado y lo deja a la vista.
