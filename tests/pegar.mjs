@@ -33,7 +33,7 @@ await ctx.exposeBinding('__gmSet', (_f, k, v) => { if (v === undefined) delete m
 await ctx.route('https://atrapa.local/documento', (r) => r.fulfill({ contentType: 'text/html', body: ATRAPA_DOCUMENTO }));
 await ctx.route('https://atrapa.local/ventana', (r) => r.fulfill({ contentType: 'text/html', body: ATRAPA_VENTANA }));
 const SHIM = (mem) => `(() => {
-  const o = Element.prototype.attachShadow; Element.prototype.attachShadow = function (x) { return (window.__sombra = o.call(this, Object.assign({}, x, { mode: 'open' }))); };
+  const o = Element.prototype.attachShadow; Element.prototype.attachShadow = function (x) { return (window.__sombra = o.call(this, x)); /* cerrada, como en Chrome */ };
   const mem = ${JSON.stringify(mem)};
   window.GM_getValue = (k, d) => (k in mem && mem[k] != null ? JSON.parse(JSON.stringify(mem[k])) : d);
   window.GM_setValue = (k, v) => { mem[k] = JSON.parse(JSON.stringify(v)); window.__gmSet(k, mem[k]); };

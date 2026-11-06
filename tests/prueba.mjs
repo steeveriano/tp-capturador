@@ -52,7 +52,7 @@ await ctx.exposeBinding('__gmSet', (_f, k, v) => { memoria[k] = v; });
 const SHIM = (mem) => `
   (() => {
     const orig = Element.prototype.attachShadow;
-    Element.prototype.attachShadow = function (o) { const s = orig.call(this, Object.assign({}, o, { mode: 'open' })); window.__sombra = s; return s; };
+    Element.prototype.attachShadow = function (o) { const s = orig.call(this, o); window.__sombra = s; return s; /* cerrada, como en Chrome */ };
     const mem = ${JSON.stringify(mem)};
     window.GM_getValue = (k, d) => (k in mem ? JSON.parse(JSON.stringify(mem[k])) : d);
     window.GM_setValue = (k, v) => { mem[k] = JSON.parse(JSON.stringify(v)); window.__gmSet(k, mem[k]); };

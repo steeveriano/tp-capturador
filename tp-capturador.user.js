@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TP Capturador
 // @namespace    https://github.com/steeveriano/tp-capturador
-// @version      2.3.6
+// @version      2.3.7
 // @description  Contactos a Google Sheets, menú propio de clic derecho, historial del portapapeles, recorte de zonas, post-its del día y puente Hermes ⇄ ChatGPT.
 // @author       Steeve Riaño · tierraparaiso
 // @homepageURL  https://github.com/steeveriano/tp-capturador
@@ -39,7 +39,7 @@
   'use strict';
   if (window.top !== window.self) return;
 
-  const VERSION = '2.3.6';
+  const VERSION = '2.3.7';
   const REPO = 'https://github.com/steeveriano/tp-capturador';
   const HOST = location.hostname;
 
@@ -2290,8 +2290,11 @@
   // la página para llevarlo a su propia caja. Lo que se pega en un campo nuestro no les llega; y si
   // una de ellas ya lo bloqueó antes que nosotros, se escribe a mano.
   window.addEventListener('paste', (e) => {
-    const t = e.composedPath()[0];
-    if (!raiz || !e.composedPath().includes(raiz) || !(t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement)) return;
+    // La interfaz es una sombra cerrada: desde window, composedPath() no muestra sus campos (solo
+    // el anfitrión). El campo donde se pega es el que tiene el foco dentro de la sombra.
+    if (!raiz || !sombra || !e.composedPath().includes(raiz)) return;
+    const t = sombra.activeElement;
+    if (!(t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement)) return;
     e.stopImmediatePropagation();
     if (!e.defaultPrevented) return;
     const texto = e.clipboardData ? e.clipboardData.getData('text/plain') : '';

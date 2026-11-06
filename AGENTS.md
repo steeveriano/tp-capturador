@@ -18,3 +18,4 @@ Aplica a personas y a agentes (Claude Code, otros chats).
     Agente: <quién hizo el cambio>
     ```
 11. Las solicitudes llegan como issues desde el botón **Pedir un cambio**. Se cierran con el commit que las resuelve (`Cierra #N`).
+12. **Las pruebas usan la sombra cerrada, como en Chrome.** El simulador guarda la referencia que devuelve `attachShadow` pero no cambia el modo a `open`. Con la sombra abierta, `composedPath()` muestra los campos internos desde fuera y esconde errores reales: así pasó la 2.3.5, que en Chrome no aislaba el pegado. Para saber en qué campo ocurre algo desde un oyente de `window` o `document`, usar `sombra.activeElement`.

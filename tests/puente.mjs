@@ -73,7 +73,7 @@ await ctx.route('https://chatgpt.com/**', (r) => r.fulfill({ contentType: 'text/
 const SHIM = (mem) => `
   (() => {
     const orig = Element.prototype.attachShadow;
-    Element.prototype.attachShadow = function (o) { const s = orig.call(this, Object.assign({}, o, { mode: 'open' })); window.__sombra = s; return s; };
+    Element.prototype.attachShadow = function (o) { const s = orig.call(this, o); window.__sombra = s; return s; /* cerrada, como en Chrome */ };
     const mem = ${JSON.stringify(mem)};
     const oyentes = {}; let n = 0;
     const avisar = (k, viejo, v, remoto) => Object.values(oyentes).filter((o) => o.k === k).forEach((o) => o.cb(k, viejo, v, remoto));

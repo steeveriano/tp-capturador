@@ -1,5 +1,12 @@
 # Cambios
 
+## 2.3.7 · 2026-11-05 23:38 (Bogotá)
+
+- **Pegar dentro de los post-its en claude.ai, ahora sí.** El arreglo de la 2.3.5 buscaba el campo con `composedPath()` desde `window`, pero la interfaz es una sombra cerrada: desde fuera solo se ve el anfitrión, el script creía que el pegado no era suyo y lo dejaba pasar al chat. Ahora usa el campo con foco dentro de la sombra.
+- **Las pruebas no detectaron el error** porque el simulador abría la sombra. Todas las pruebas usan ahora la sombra cerrada, como en Chrome (AGENTS.md, regla 12). Con eso `tests/pegar.mjs` reprodujo la falla antes del arreglo, y el resto de pruebas (193 casos) pasan igual con la sombra cerrada.
+
+Origen: reporte de Steeve en el chat https://claude.ai/chat/5658e950-6b45-4967-93af-7c220e4f7d88 (5-nov-2026 23:35): no podía pegar en las notas del post-it en claude.ai.
+
 ## 2.3.6 · 2026-11-04 05:41 (Bogotá)
 
 - **La activación pregunta con un cuadro dentro de la página**, no con las ventanas nativas de Chrome. Esas ventanas pueden no mostrarse cuando la pestaña se abre desde el atajo del Escritorio con Chrome detrás: el script leía el enlace, borraba la clave de la dirección y la activación se perdía sin aviso. Verificado en el Chrome de Steeve que el script sí lee el enlace (prueba sin clave). Al activar, manda en seguida lo que estaba en cola.
