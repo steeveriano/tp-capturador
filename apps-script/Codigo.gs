@@ -16,7 +16,7 @@ const PESTANA = 'Capturas';
 const PESTANA_POSTITS = 'Post-its';
 const ENC_POSTITS = ['Id post-it', 'Hora (Bogotá)', 'Origen', 'Tema', 'Categoría', 'Texto · decisión o pendiente',
   'Siguiente paso', 'Estado', 'Sitio', 'URL', 'Proyecto o chat', 'Perfil', 'Evento'];
-const ESTADOS_POSTIT = ['abierto', 'hecho', 'borrado'];
+const ESTADOS_POSTIT = ['abierto', 'hecho', 'archivado', 'borrado']; // «borrado»: filas viejas en cola (hasta la 2.3.7)
 const ENCABEZADOS = ['Fecha (Bogotá)', 'Tipo', 'Valor', 'Nota', 'Sitio', 'Título de la página', 'Dirección', 'Perfil', 'Versión'];
 const CON_DEDUP = ['telefono', 'correo'];
 const ZONA = 'America/Bogota';

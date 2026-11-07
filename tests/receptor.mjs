@@ -68,11 +68,13 @@ ok(P().filas.length === 3 && P().filas[2][7] === 'hecho', 'un cambio llega como 
 ok(P().filas[2][3] === '\'=HIPERVINCULO("x")', 'un tema que empieza por «=» entra como texto, no como fórmula');
 ok(P().filas[1][7] === 'abierto', 'la fila anterior sigue igual');
 
+enviar(Object.assign({}, base, { evento: 'ev-a', estado: 'archivado' }));
+ok(P().filas.at(-1)[7] === 'archivado', 'acepta el estado «archivado» (los post-its no se borran)');
 enviar(Object.assign({}, base, { evento: 'ev-3', estado: 'cualquiera', hora: 'ayer' }));
-ok(P().filas[3][7] === 'abierto' && P().filas[3][1] === '2026-11-04 00:10:00', 'estado desconocido queda abierto; una hora inválida se reemplaza por la del servidor');
+ok(P().filas[4][7] === 'abierto' && P().filas[4][1] === '2026-11-04 00:10:00', 'estado desconocido queda abierto; una hora inválida se reemplaza por la del servidor');
 
 r = enviar(Object.assign({}, base, { token: 'otra', evento: 'ev-4' }));
-ok(!r.ok && r.error === 'token' && P().filas.length === 4, 'sin la clave correcta no escribe nada');
+ok(!r.ok && r.error === 'token' && P().filas.length === 5, 'sin la clave correcta no escribe nada');
 
 r = enviar({ token: 'clave-de-prueba-123', tipo: 'telefono', valor: '+573001112233', sitio: 'x' });
 ok(r.ok && hojas.Capturas.filas.length === 2 && hojas.Capturas.filas[1][2] === "'+573001112233", 'las capturas de siempre siguen yendo a «Capturas»');

@@ -1,5 +1,17 @@
 # Cambios
 
+## 2.3.8 · 2026-11-07 15:13 (Bogotá)
+
+- **Nunca se borra un post-it** (decisión de Steeve). Lo que antes se borraba ahora se **archiva**: sale de la pila, se guarda sin límite de tiempo y vuelve a la pila desde el menú de Tampermonkey › *Archivo de post-its*.
+  - Se quitó la limpieza automática que eliminaba la papelera a los 7 días. Lo que estaba en la papelera queda en el archivo.
+  - La tarjeta tiene *Archivar* en lugar de *Borrar*.
+  - La pregunta del día nuevo ya no ofrece *Borrar todos* ni *Solo lo pendiente* (que quitaba tareas hechas). Ahora: *Mantener todos* o *Archivar los terminados*, con las tareas intactas; los desmarcados uno por uno también se archivan.
+  - Si un cambio deja de listar un post-it con contenido, se archiva en vez de borrarse. Solo se descarta el post-it que nunca tuvo nada escrito.
+- Bitácora: el estado `borrado` pasa a `archivado`. El receptor de Apps Script acepta `archivado` (y sigue aceptando `borrado` de filas viejas en cola).
+- AGENTS.md, regla 13. Pruebas: archivar y recuperar, la pregunta del día sin opciones de borrar, el archivo que no vence a los 40 días (control negativo: con la purga de 7 días de vuelta, la prueba falla).
+
+Origen: decisión de Steeve en el chat https://claude.ai/chat/5658e950-6b45-4967-93af-7c220e4f7d88 (7-nov-2026 15:06): «nunca me borres los post-it».
+
 ## 2.3.7 · 2026-11-05 23:38 (Bogotá)
 
 - **Pegar dentro de los post-its en claude.ai, ahora sí.** El arreglo de la 2.3.5 buscaba el campo con `composedPath()` desde `window`, pero la interfaz es una sombra cerrada: desde fuera solo se ve el anfitrión, el script creía que el pegado no era suyo y lo dejaba pasar al chat. Ahora usa el campo con foco dentro de la sombra.

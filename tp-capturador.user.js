@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TP Capturador
 // @namespace    https://github.com/steeveriano/tp-capturador
-// @version      2.3.7
+// @version      2.3.8
 // @description  Contactos a Google Sheets, menú propio de clic derecho, historial del portapapeles, recorte de zonas, post-its del día y puente Hermes ⇄ ChatGPT.
 // @author       Steeve Riaño · tierraparaiso
 // @homepageURL  https://github.com/steeveriano/tp-capturador
@@ -39,7 +39,7 @@
   'use strict';
   if (window.top !== window.self) return;
 
-  const VERSION = '2.3.7';
+  const VERSION = '2.3.8';
   const REPO = 'https://github.com/steeveriano/tp-capturador';
   const HOST = location.hostname;
 
@@ -231,6 +231,8 @@
     .pmodal header { padding: 18px 20px 8px; }
     .pmodal h2 { margin: 0 0 4px; font-size: 18px; font-weight: 700; }
     .pmodal header p { margin: 0; color: #9ca3af; }
+    .pm-acciones.dos { grid-template-columns: repeat(2, 1fr); }
+    .menu.archivo { max-height: 70vh; overflow-y: auto; }
     .pm-acciones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 10px 20px 4px; }
     .pm-acciones button { all: unset; cursor: pointer; display: flex; flex-direction: column; gap: 3px; padding: 10px 11px; border-radius: 9px; background: #1f2937; border: 1px solid #374151; }
     .pm-acciones button:hover { border-color: #6b7280; }
@@ -864,7 +866,9 @@
     { id: 'ideas', nombre: 'Ideas', color: '#64748b' },
   ];
   const PALETA = ['#dc2626', '#ea580c', '#d97706', '#65a30d', '#059669', '#0891b2', '#2563eb', '#7c3aed', '#db2777', '#64748b'];
-  const PAPELERA_DIAS = 7;
+  // Regla de Steeve (7-nov-2026): un post-it nunca se borra. Lo que antes era «papelera» es el
+  // archivo: sale de la pila, se guarda sin límite de tiempo y se recupera cuando se quiera.
+  // (El campo interno sigue llamándose «borrada» para no migrar datos: es la fecha de archivo.)
   const ID_TAB = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const nid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const fechaBogota = (t) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(t ? new Date(t) : new Date());
@@ -910,14 +914,13 @@
     const previo = new Map([...antes.notas, ...antes.papelera].map((n) => [n.id, JSON.stringify(n)]));
     const e = JSON.parse(JSON.stringify(antes));
     fn(e);
-    const ahora = Date.now(), limite = ahora - PAPELERA_DIAS * 864e5;
+    const ahora = Date.now();
     const vistas = new Set();
     let cambio = false, tapados = 0;
     const escribir = (n, enPapelera) => {
       if (!n || vistas.has(n.id)) return;
       vistas.add(n.id);
       if (enPapelera) { if (!n.borrada) n.borrada = ahora; } else delete n.borrada;
-      if (n.borrada && n.borrada < limite) { if (previo.has(n.id)) { GM_deleteValue(CLAVE_NOTA + n.id); cambio = true; } return; }
       tapados += limpiarNota(n);
       if (JSON.stringify(n) === previo.get(n.id)) return;
       const eraBorrada = previo.has(n.id) && JSON.parse(previo.get(n.id)).borrada;
@@ -929,7 +932,14 @@
     };
     e.notas.forEach((n) => escribir(n, false));
     e.papelera.forEach((n) => escribir(n, true));
-    for (const id of previo.keys()) if (!vistas.has(id)) { GM_deleteValue(CLAVE_NOTA + id); cambio = true; }
+    // Un post-it que desaparece de las dos listas no se borra: se archiva. Solo se descarta uno que
+    // nunca tuvo nada escrito (el que se abre con «+ Nuevo» y se cierra en blanco).
+    for (const [id, json] of previo) {
+      if (vistas.has(id)) continue;
+      const n = JSON.parse(json);
+      if (!n.titulo && !n.items.length && !n.contexto) { GM_deleteValue(CLAVE_NOTA + id); cambio = true; }
+      else escribir(n, true);
+    }
     if (e.dia !== antes.dia) { GM_setValue('postits:dia', e.dia); cambio = true; }
     if (cambio) GM_setValue('postits:cambio', { t: ahora, tab: ID_TAB });
     if (tapados) {
@@ -1029,7 +1039,7 @@
       n.items.push(Object.assign({ id: nid(), texto: texto.slice(0, 1000), hecho: false, t: Date.now() }, o ? { url: o.url, pagina: o.pagina } : {}));
     });
   }
-  function borrarNota(id) {
+  function archivarNota(id) {
     mutarNotas((e) => {
       const n = buscarNota(e, id);
       if (!n) return;
@@ -1269,7 +1279,7 @@
       h('div', { class: 'pt-cab' }, chip, h('span', { class: 'pt-esp' }),
         n.origen && n.origen.url ? icono('Volver ahí', 'Abrir la página de donde salió' + (n.ancla ? ' y saltar al párrafo' : ''), () => volverAhi(n)) : null,
         icono('Copiar', 'Copiar como texto', () => { guardarYa(); copiar(textoDeNota(buscarNota(estadoNotas(), id))); toast('Post-it copiado.', 'ok'); }),
-        icono('Borrar', 'Mover a la papelera (se recupera durante 7 días)', () => { descartarPendientes(); tarjeta.nodo.remove(); tarjeta = null; borrarNota(id); toast('Post-it borrado. Se recupera 7 días desde el menú de Tampermonkey.', 'aviso'); }),
+        icono('Archivar', 'Sacarlo de la pila. Se guarda en el archivo para siempre y se recupera cuando quieras', () => { guardarYa(); tarjeta.nodo.remove(); tarjeta = null; archivarNota(id); toast('Post-it archivado. Está guardado: menú de Tampermonkey › «Archivo de post-its» para devolverlo a la pila.', 'ok'); }),
         icono('✕', 'Cerrar (Esc)', cerrarTarjeta)),
       selector, titulo,
       h('div', { class: 'pt-lista' }, filas),
@@ -1332,12 +1342,12 @@
     pintar();
   }
 
-  // ── Papelera ──
+  // ── Archivo: los post-its que salieron de la pila. Se guardan siempre. ──
   function recuperarNotas() {
     const e = estadoNotas();
-    if (!e.papelera.length) { toast('La papelera de post-its está vacía.', 'ok'); return; }
-    const items = [seccion('Post-its borrados · últimos 7 días')];
-    for (const n of e.papelera.slice(0, 15)) {
+    if (!e.papelera.length) { toast('El archivo de post-its está vacío.', 'ok'); return; }
+    const items = [seccion(`Archivo de post-its · ${e.papelera.length} · clic para devolverlo a la pila`)];
+    for (const n of e.papelera.slice(0, 40)) {
       items.push(boton([h('i', { class: 'punto', style: '--c:' + categoria(n.cat).color }), corto(tituloDe(n), 34)], () => {
         mutarNotas((x) => {
           const i = x.papelera.findIndex((y) => y.id === n.id);
@@ -1351,7 +1361,8 @@
         toast('Recuperado: ' + corto(tituloDe(n), 50), 'ok');
       }, diaCorto(fechaBogota(n.borrada))));
     }
-    abrir(h('div', { class: 'menu' }, items), window.innerWidth / 2 - 150, 90, 'papelera');
+    if (e.papelera.length > 40) items.push(h('div', { class: 'pie' }, `Se muestran los 40 más recientes de ${e.papelera.length}. Todos siguen guardados.`));
+    abrir(h('div', { class: 'menu archivo' }, items), window.innerWidth / 2 - 150, 90, 'papelera');
   }
 
   // ── Día nuevo: qué hacer con los post-its del día anterior ──
@@ -1386,19 +1397,15 @@
       velo.remove(); modalDia = null;
       if (aviso) toast(aviso, 'ok');
     };
-    const aPapelera = (x, quedan) => {
+    const archivar = (x, quedan) => {
       const ahora = Date.now();
       const van = x.notas.filter((n) => ids.includes(n.id) && !quedan(n));
       x.notas = x.notas.filter((n) => !van.includes(n));
       x.papelera.unshift(...van.map((n) => Object.assign(n, { borrada: ahora })));
     };
-    // Quita las tareas hechas. Un post-it con todas sus tareas hechas y sin notas de contexto
-    // se va a la papelera; uno que nunca tuvo tareas (solo título o notas) se queda.
-    const soloPendiente = (x) => {
-      const teniaTareas = new Set(e.notas.filter((n) => n.items.length).map((n) => n.id));
-      for (const n of x.notas) if (ids.includes(n.id)) n.items = n.items.filter((i) => !i.hecho);
-      aPapelera(x, (n) => n.items.length > 0 || !!n.contexto || !teniaTareas.has(n.id));
-    };
+    // Nada se borra: los post-its con todas sus tareas hechas pasan al archivo, con sus tareas intactas.
+    const terminado = (n) => n.items.length > 0 && n.items.every((i) => i.hecho);
+    const nTerminados = e.notas.filter(terminado).length;
 
     const filas = h('div', { class: 'pm-lista' });
     const pintarFilas = () => filas.replaceChildren(...e.notas.map((n) => {
@@ -1419,17 +1426,17 @@
     const caja = h('div', { class: 'pmodal', role: 'dialog', 'aria-label': 'Post-its del día anterior' },
       h('header', null,
         h('h2', null, 'Buen día. Hoy es ' + diaLargo(hoy) + '.'),
-        h('p', null, `Tienes ${e.notas.length} post-its ${deCuando}: ${pend} tareas pendientes y ${hechas} hechas. ¿Qué hacemos con ellos?`)),
-      h('div', { class: 'pm-acciones' },
-        accion('Mantener todos', 'Siguen igual, con lo hecho tachado', () => terminar(null, 'Post-its conservados.')),
-        accion('Solo lo pendiente', 'Quita las tareas hechas y los post-its terminados', () => terminar(soloPendiente, 'Listo: quedó solo lo pendiente.'), 'prim'),
-        accion('Borrar todos', 'Empiezas el día en blanco', () => terminar((x) => aPapelera(x, () => false), 'Post-its borrados. Se recuperan 7 días desde el menú de Tampermonkey.'))),
-      h('div', { class: 'pm-sub' }, 'O decide uno por uno: marca los que se quedan.'),
+        h('p', null, `Tienes ${e.notas.length} post-its ${deCuando}: ${pend} tareas pendientes y ${hechas} hechas. Ninguno se borra: lo que no quieras ver hoy pasa al archivo.`)),
+      h('div', { class: 'pm-acciones dos' },
+        accion('Mantener todos', 'Siguen en la pila, con lo hecho tachado', () => terminar(null, 'Post-its conservados.'), 'prim'),
+        accion('Archivar los terminados', nTerminados ? `${nTerminados} con todas sus tareas hechas salen de la pila y quedan en el archivo` : 'Ninguno está terminado todavía',
+          () => terminar((x) => archivar(x, (n) => !terminado(n)), nTerminados ? `${nTerminados} post-its pasaron al archivo.` : 'Post-its conservados.'))),
+      h('div', { class: 'pm-sub' }, 'O decide uno por uno: los que desmarques pasan al archivo (no se borran).'),
       filas,
       h('footer', null,
         h('button', { on: { click: () => { GM_setValue('postits:pospuesto', Date.now() + 60 * 60e3); GM_setValue('postits:revision', null); velo.remove(); modalDia = null; } } }, 'Decidir en una hora'),
         h('span', { class: 'pt-esp' }),
-        h('button', { class: 'prim', on: { click: () => terminar((x) => aPapelera(x, (n) => mantener.has(n.id)), `Quedan ${mantener.size} post-its.`) } }, 'Aplicar mi selección')));
+        h('button', { class: 'prim', on: { click: () => terminar((x) => archivar(x, (n) => mantener.has(n.id)), `Quedan ${mantener.size} post-its en la pila; los demás, en el archivo.`) } }, 'Aplicar mi selección')));
     const velo = h('div', { class: 'pvelo' }, caja);
     modalDia = velo;
     ui().appendChild(velo);
@@ -1487,7 +1494,7 @@
   }
 
   // ── Bitácora en la hoja: pestaña «Post-its», solo se agregan filas ──
-  // Cada post-it creado, editado, terminado o borrado en esta pestaña manda una fila. Los cambios
+  // Cada post-it creado, editado, terminado o archivado en esta pestaña manda una fila. Los cambios
   // seguidos del mismo post-it se juntan (6 s) para no llenar la hoja de una fila por tecla.
   const pendBitacora = new Set();
   let timerBitacora = null, avisoBitacora = false;
@@ -1496,7 +1503,7 @@
     clearTimeout(timerBitacora);
     timerBitacora = setTimeout(enviarBitacora, 6000);
   }
-  const estadoBitacora = (n) => (n.borrada ? 'borrado' : n.items.length && n.items.every((i) => i.hecho) ? 'hecho' : 'abierto');
+  const estadoBitacora = (n) => (n.borrada ? 'archivado' : n.items.length && n.items.every((i) => i.hecho) ? 'hecho' : 'abierto');
   const textoBitacora = (n) => n.items.map((i) => (i.hecho ? '[x] ' : '[ ] ') + i.texto).concat(n.contexto ? [n.contexto] : []).join('\n');
   function filaBitacora(n) {
     const o = n.origen || {};
@@ -2265,8 +2272,8 @@
     GM_registerMenuCommand((c.postits ? 'Ocultar' : 'Mostrar') + ' los post-its (Alt+N los pliega)', () => { setCfg({ postits: !cfg().postits }); if (!cfg().postits) cerrarTarjeta(); pintarPostits(); });
     GM_registerMenuCommand('Revisar los post-its del día', () => revisarDia(true));
     GM_registerMenuCommand('Categorías de post-its', editarCategorias);
-    const papelera = estadoNotas().papelera.filter((n) => n.borrada > Date.now() - PAPELERA_DIAS * 864e5).length;
-    if (papelera) GM_registerMenuCommand(`Recuperar post-its borrados (${papelera})`, recuperarNotas);
+    const archivados = estadoNotas().papelera.length;
+    if (archivados) GM_registerMenuCommand(`Archivo de post-its (${archivados})`, recuperarNotas);
     if (c.hoja) GM_registerMenuCommand('Abrir la hoja de capturas', () => GM_openInTab(c.hoja, { active: true }));
     GM_registerMenuCommand(`Enviar pendientes (${GM_getValue('cola', []).length})`, () => vaciarCola(true));
     GM_registerMenuCommand('Desactivar en este sitio (' + HOST + ')', alternarSitio);

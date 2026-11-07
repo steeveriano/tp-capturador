@@ -193,13 +193,13 @@ await esperarFilas(filas.length + 1, 9000);
 await B.waitForTimeout(6500);
 ok(!filas.some((x) => /sk-abcdef|Xy7!kQ2/.test(JSON.stringify(x))), 'ninguna fila de la hoja lleva una clave');
 
-// 7. Borrar manda una fila con estado «borrado»
+// 7. Archivar manda una fila con estado «archivado»
 const antesBorrar = filas.length;
 await B.evaluate(() => window.__sombra.querySelector('.pmini').click());
 await B.waitForTimeout(80);
-await clic(B, '.ptarjeta .pt-icono', 'Borrar');
+await clic(B, '.ptarjeta .pt-icono', 'Archivar');
 await esperarFilas(antesBorrar + 1);
-ok(filas.at(-1).estado === 'borrado' && filas.at(-1).tema.startsWith('Otra página'), 'borrar un post-it deja una fila con estado borrado');
+ok(filas.at(-1).estado === 'archivado' && filas.at(-1).tema.startsWith('Otra página'), 'archivar un post-it deja una fila con estado archivado');
 
 // 8. Sin conexión: la fila queda en la cola y sale después, sin perder nada
 receptor = 'caido';

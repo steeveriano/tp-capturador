@@ -194,21 +194,22 @@ await A.keyboard.press('Alt+n');
 await A.waitForTimeout(40);
 ok(!(await A.evaluate(() => window.__sombra.querySelector('.pdock').classList.contains('plegado'))), 'Alt+N los vuelve a mostrar');
 
-// 11. Borrar y recuperar
+// 11. Archivar y recuperar: nunca se borra
 await A.evaluate(() => { [...window.__sombra.querySelectorAll('.pmini')].find((m) => m.textContent.includes('Idea de estados')).click(); });
 await A.waitForTimeout(40);
-await clic(A, '.ptarjeta .pt-icono', 'Borrar');
+ok(!(await textos(A, '.ptarjeta .pt-icono')).some((t) => t === 'Borrar'), 'la tarjeta no tiene botón «Borrar»');
+await clic(A, '.ptarjeta .pt-icono', 'Archivar');
 await A.waitForTimeout(60);
 e = estado();
-ok(e.notas.length === 1 && e.papelera.length === 1, 'borrar un post-it lo manda a la papelera');
+ok(e.notas.length === 1 && e.papelera.length === 1 && e.papelera[0].titulo === 'Idea de estados', 'archivar saca el post-it de la pila y lo guarda en el archivo');
 await A.evaluate(() => { window.__menu = []; });
 await A.evaluate(SCRIPT.replace(/registrarComandos\(\);\n  if \(sitioDesactivado\(\)\) return;[\s\S]*$/, 'registrarComandos(); })();'));
-ok((await A.evaluate(() => window.__menu)).some((t) => t.startsWith('Recuperar post-its borrados (1)')), 'el menú de Tampermonkey ofrece recuperarlo');
-await A.evaluate(() => window.__menuFn[window.__menu.find((t) => t.startsWith('Recuperar'))]());
+ok((await A.evaluate(() => window.__menu)).some((t) => t.startsWith('Archivo de post-its (1)')), 'el menú de Tampermonkey ofrece el archivo');
+await A.evaluate(() => window.__menuFn[window.__menu.find((t) => t.startsWith('Archivo de post-its'))]());
 await A.waitForTimeout(40);
-ok(await clic(A, '.menu button', 'Idea de estados'), 'la papelera lista el post-it borrado');
+ok(await clic(A, '.menu button', 'Idea de estados'), 'el archivo lista el post-it archivado');
 await A.waitForTimeout(60);
-ok(estado().notas.length === 2 && !estado().papelera.length, 'recuperar lo devuelve a la pila');
+ok(estado().notas.length === 2 && !estado().papelera.length, 'recuperarlo lo devuelve a la pila');
 
 // 12. Categorías: crear una nueva
 A.__respuesta = 'Hermes';
@@ -228,7 +229,7 @@ await C.waitForTimeout(1500);
 ok(!(await textos(C, '.pmodal')).length, 'el mismo día no vuelve a preguntar (control negativo)');
 await C.close(); paginas.clear();
 
-// 14. Día nuevo: pregunta y «Solo lo pendiente»
+// 14. Día nuevo: la pregunta no ofrece borrar; «Archivar los terminados» no borra nada
 const DIA_ANTERIOR = (notas) => ({ dia: AYER, papelera: [], notas });
 const t0 = Date.now() - 864e5;
 const NOTAS = () => [
@@ -236,40 +237,55 @@ const NOTAS = () => [
   { id: 'n2', titulo: 'Terminada', cat: 'operacion', contexto: '', creada: t0, items: [{ id: 'c', texto: 'hecha', hecho: true }] },
   { id: 'n3', titulo: 'Solo título', cat: 'ideas', contexto: '', creada: t0, items: [] },
 ];
+const intactas = () => ['n1', 'n2', 'n3'].every((id) => memoria['postit:' + id]) && memoria['postit:n1'].items.length === 2 && memoria['postit:n2'].items.length === 1;
 sembrar(DIA_ANTERIOR(NOTAS())); memoria['postits:revision'] = null; memoria['postits:pospuesto'] = 0;
 C = await abrirPestana('https://prueba.local/manana');
 await C.waitForTimeout(1500);
 const cab = (await textos(C, '.pmodal h2'))[0] || '';
 ok(cab.startsWith('Buen día. Hoy es'), 'al abrir el día nuevo aparece la pregunta');
 ok(((await textos(C, '.pmodal header p'))[0] || '').includes('3 post-its de ayer: 1 tareas pendientes y 2 hechas'), 'la pregunta resume lo que quedó de ayer');
+ok(!(await textos(C, '.pmodal button')).some((t) => /borrar|solo lo pendiente/i.test(t)), 'la pregunta del día no ofrece borrar nada');
 ok((await textos(C, '.pmini .pm-edad')).length === 3, 'los post-its que vienen de días anteriores muestran su edad');
-await clic(C, '.pm-acciones button', 'Solo lo pendiente');
+await clic(C, '.pm-acciones button', 'Archivar los terminados');
 await C.waitForTimeout(80);
 e = estado();
 ok(e.dia === HOY, 'decidir fija el día de trabajo en hoy');
-ok(e.notas.map((n) => n.id).join() === 'n1,n3', '«Solo lo pendiente» quita el post-it terminado y deja el de solo título');
-ok(e.notas[0].items.length === 1 && e.notas[0].items[0].texto === 'pendiente', '«Solo lo pendiente» quita las tareas hechas');
-ok(e.papelera.some((n) => n.id === 'n2'), 'el post-it terminado queda en la papelera');
+ok(e.notas.map((n) => n.id).join() === 'n1,n3' && e.papelera.map((n) => n.id).join() === 'n2', '«Archivar los terminados» saca de la pila solo el que tiene todo hecho');
+ok(intactas(), 'ningún post-it ni ninguna tarea se borró: las tareas hechas siguen ahí');
 ok(!(await textos(C, '.pmodal')).length && memoria['postits:revision'] === null, 'la pregunta se cierra y suelta el turno');
 await C.close(); paginas.clear();
 
-// 15. «Borrar todos» y «Aplicar mi selección»
+// 15. «Mantener todos» y «Aplicar mi selección»
 sembrar(DIA_ANTERIOR(NOTAS()));
 C = await abrirPestana('https://prueba.local/manana');
 await C.waitForTimeout(1500);
-await clic(C, '.pm-acciones button', 'Borrar todos');
+await clic(C, '.pm-acciones button', 'Mantener todos');
 await C.waitForTimeout(80);
-ok(!estado().notas.length && estado().papelera.length === 3, '«Borrar todos» deja el día en blanco y todo en la papelera');
+ok(estado().notas.length === 3 && !estado().papelera.length && intactas(), '«Mantener todos» deja los tres en la pila, sin tocar nada');
 await C.close(); paginas.clear();
 
 sembrar(DIA_ANTERIOR(NOTAS()));
 C = await abrirPestana('https://prueba.local/manana');
 await C.waitForTimeout(1500);
-await C.evaluate(() => [...window.__sombra.querySelectorAll('.pm-nota')].find((n) => n.textContent.includes('Terminada')).click());
+await C.evaluate(() => [...window.__sombra.querySelectorAll('.pm-nota')].find((n) => n.textContent.includes('Solo título')).click());
 await clic(C, '.pmodal footer button', 'Aplicar mi selección');
 await C.waitForTimeout(80);
 e = estado();
-ok(e.notas.map((n) => n.id).join() === 'n1,n3' && e.notas[0].items.length === 2, '«Aplicar mi selección» deja los marcados tal como estaban y quita el desmarcado');
+ok(e.notas.map((n) => n.id).join() === 'n1,n2' && e.papelera.map((n) => n.id).join() === 'n3' && intactas(), '«Aplicar mi selección» archiva el desmarcado; no borra nada');
+await C.close(); paginas.clear();
+
+// 15-bis. El archivo no vence: un post-it archivado hace 40 días sigue guardado
+sembrar({ dia: HOY, notas: [{ id: 'v1', titulo: 'Activo', cat: 'ideas', contexto: '', creada: Date.now(), items: [] }],
+  papelera: [{ id: 'v2', titulo: 'Archivado hace 40 días', cat: 'ideas', contexto: '', creada: Date.now() - 41 * 864e5, borrada: Date.now() - 40 * 864e5, items: [{ id: 'x', texto: 'idea vieja', hecho: false }] }] });
+C = await abrirPestana('https://prueba.local/hoy');
+await C.waitForTimeout(400);
+await C.evaluate(() => [...window.__sombra.querySelectorAll('.pmini')].find((m) => m.textContent.includes('Activo')).click());
+await C.waitForTimeout(60);
+await C.evaluate(() => { const t = window.__sombra.querySelector('.pt-titulo'); t.focus(); t.select(); });
+await C.keyboard.type('Activo editado');
+await C.keyboard.press('Escape');
+await C.waitForTimeout(150);
+ok(memoria['postit:v2'] && memoria['postit:v2'].items[0].texto === 'idea vieja', 'un post-it archivado hace 40 días no se borra al guardar otros cambios');
 await C.close(); paginas.clear();
 
 // 16. Una sola pestaña pregunta: con el turno tomado por otra pestaña reciente, no pregunta

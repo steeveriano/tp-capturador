@@ -43,16 +43,16 @@ Si hay un script viejo "Sales TierraParaíso — Capturador de Contactos", **hay
 - **Dónde están:** una pestaña oscura **Post-its** en el borde derecho; al lado, los post-its pequeños con su categoría, título y avance (`2/5`). Se arrastra la pestaña hacia arriba o abajo para moverlos. **Alt+N** o un clic en la pestaña los pliega y los despliega.
 - **Crear:** selecciona un texto › clic derecho › *Agregar post-it…* › *Nuevo post-it con esto*; o el botón *Post-it* de la barra al seleccionar; o *+ Nuevo* en la pila; o clic derecho › *Nuevo post-it*. Lo seleccionado entra como primera tarea, con un enlace ↗ a la página de donde salió (dominio y ruta, sin parámetros).
 - **Sumar a uno existente:** el mismo submenú lista tus post-its: *Agregar como tarea a…*.
-- **Abrir:** clic en un post-it pequeño. Se edita el título, se marcan tareas, se agregan con Enter, se cambia la categoría con la etiqueta de color y hay un campo de *Notas de contexto*. *Copiar* lo pasa como texto; *Borrar* lo manda a la papelera.
+- **Abrir:** clic en un post-it pequeño. Se edita el título, se marcan tareas, se agregan con Enter, se cambia la categoría con la etiqueta de color y hay un campo de *Notas de contexto*. *Copiar* lo pasa como texto; *Archivar* lo saca de la pila y lo guarda en el archivo.
 - **Categorías:** Urgente, Comercial, Operación, Desarrollo, Gestión, Personal e Ideas. Los puntos de color de la pila filtran por categoría. Se crean, renombran, recolorean o quitan en *Categorías de post-its* (menú de Tampermonkey o *Editar categorías…* en la tarjeta).
-- **Día nuevo:** la primera vez que abres Chrome en un día nuevo (hora de Bogotá) aparece *Buen día* con tres salidas: **Mantener todos**, **Solo lo pendiente** (quita lo hecho y los post-its terminados) o **Borrar todos**; o marcas uno por uno cuáles se quedan. *Decidir en una hora* pospone la pregunta. Pregunta una sola pestaña, no todas. Los que vienen de días anteriores muestran su edad (`2 d`).
+- **Día nuevo:** la primera vez que abres Chrome en un día nuevo (hora de Bogotá) aparece *Buen día* con dos salidas: **Mantener todos** o **Archivar los terminados** (los que tienen todas sus tareas hechas salen de la pila, con sus tareas intactas); o desmarcas uno por uno los que pasan al archivo. *Decidir en una hora* pospone la pregunta. Pregunta una sola pestaña, no todas. Los que vienen de días anteriores muestran su edad (`2 d`).
 - **Anclar:** **Alt+K**, el botón azul *Anclar* de la pila, o clic derecho › *Anclar en un post-it*. Crea un post-it con el título de la página, la hora de Bogotá, el sitio y la dirección. Si hay texto seleccionado, entra como tarea y la dirección lleva un salto a ese párrafo (`#:~:text=`).
 - **Volver ahí:** botón de la tarjeta. Abre la página de origen y, cuando el contenido termina de cargar (chats de claude.ai, ChatGPT, Hermes), busca el párrafo anclado, lo marca y lo deja a la vista. Si ya estás en esa página, solo salta al párrafo.
 - **Origen siempre:** todo post-it guarda de dónde salió (título, sitio, dirección, hora), también los creados con *+ Nuevo*. Se ve al pie de la tarjeta.
-- **Bitácora en la hoja:** cada post-it creado, editado, terminado o borrado agrega una fila a la pestaña **Post-its** de *TP Capturador · Capturas*. Los cambios seguidos del mismo post-it se juntan en una fila (6 s). Las filas nunca se editan ni se borran. Sin conexión, o si el receptor todavía no conoce la pestaña, la fila espera en la cola y sale después (*Enviar pendientes*).
+- **Bitácora en la hoja:** cada post-it creado, editado, terminado o archivado agrega una fila a la pestaña **Post-its** de *TP Capturador · Capturas*. Los cambios seguidos del mismo post-it se juntan en una fila (6 s). Las filas nunca se editan ni se borran. Sin conexión, o si el receptor todavía no conoce la pestaña, la fila espera en la cola y sale después (*Enviar pendientes*).
 - **Secretos:** lo que parece una clave (llaves privadas, tokens con prefijo conocido, `password=…`, cadenas largas con mayúsculas, minúsculas, números y símbolos) se reemplaza por `[secreto omitido]` antes de guardarse, y la dirección pierde los parámetros que podrían ser claves. Es detección por patrones: no reconoce una contraseña que parezca una palabra normal.
 - **Varias pestañas:** cada post-it se guarda aparte; si dos pestañas editan post-its distintos al mismo tiempo, se conservan los dos cambios.
-- **Papelera:** lo borrado se recupera durante 7 días desde el menú de Tampermonkey › *Recuperar post-its borrados*.
+- **Nunca se borra un post-it** (regla de Steeve, 7-nov-2026). No hay botón ni opción de borrar: lo que no quieras ver pasa al **archivo**, que no vence. Menú de Tampermonkey › *Archivo de post-its (n)* › clic en uno para devolverlo a la pila. Solo se descarta un post-it que nunca tuvo nada escrito (el que abres con *+ Nuevo* y cierras en blanco).
 - Lo que escribes en un post-it no dispara los atajos de teclado de la página (Gmail, GitHub, etc.).
 - **Pegar** (Ctrl+V) en un post-it funciona también en claude.ai y ChatGPT, que atrapan el pegado de toda la página. **+ Nuevo** con texto seleccionado lo usa como primera tarea.
 
@@ -69,7 +69,7 @@ La escriben el TP Capturador (origen `script`) y los chats de Claude (origen `cl
 | Categoría | categoría | — |
 | Texto · decisión o pendiente | tareas (`[ ]`/`[x]`) y notas | qué se decidió o qué queda pendiente |
 | Siguiente paso | — | siguiente paso |
-| Estado | `abierto`, `hecho` o `borrado` | `abierto` o `hecho` |
+| Estado | `abierto`, `hecho` o `archivado` | `abierto` o `hecho` |
 | Sitio | dominio | — |
 | URL | dirección con salto al párrafo | enlace del chat, si lo hay |
 | Proyecto o chat | — | proyecto o chat |
@@ -95,7 +95,7 @@ En el clic derecho o en el menú de Tampermonkey está **Pedir un cambio a Claud
 |---|---|
 | Contactos, textos y recortes que guardas | Hoja de Google *TP Capturador · Capturas* |
 | Historial del portapapeles (texto e imágenes) | Solo en ese perfil de Chrome, 24 h. Nunca sale del navegador. Borrar el historial borra también las imágenes |
-| Post-its | En ese perfil de Chrome, en todas sus pestañas, y una fila por cambio en la pestaña *Post-its* de la hoja. La papelera guarda 7 días |
+| Post-its | En ese perfil de Chrome, en todas sus pestañas, y una fila por cambio en la pestaña *Post-its* de la hoja. Nunca se borran: el archivo no vence |
 | Dirección de la hoja y clave | Almacenamiento de Tampermonkey del perfil. **Nunca en este repositorio** |
 
 De la página de origen solo se envía el dominio y la ruta, sin parámetros, para que ningún token de una URL termine en la hoja.
